@@ -1,0 +1,19 @@
+{
+  "name": "工作导航",
+  "short_name": "工作导航",
+  "description": "把日常工作站点收进一个页面：收藏夹导入、拼音搜索、自定义壁纸，数据只存在本地浏览器。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#667eea",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

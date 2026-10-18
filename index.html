@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html data-theme="light" lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<meta content="工作导航 · 纯本地的个人工作网址导航页：卡片式收藏、收藏夹导入、拼音搜索、自定义壁纸，数据只存在你自己的浏览器里。" name="description">
+<meta content="#667eea" name="theme-color">
+<meta content="website" property="og:type">
+<meta content="工作导航 · 你的工作站点桌面" property="og:title">
+<meta content="把 OA、GitLab、监控大盘、内部 Wiki 收进一个页面，支持收藏夹导入、拼音搜索与自定义壁纸。" property="og:description">
+<meta content="summary" name="twitter:card">
+<link href="assets/favicon.svg" rel="icon" type="image/svg+xml">
+<link href="assets/favicon.svg" rel="apple-touch-icon">
+<link href="manifest.webmanifest" rel="manifest">
+<title>工作导航</title>
+<link href="assets/css/base.css" rel="stylesheet">
+<link href="assets/css/layout.css" rel="stylesheet">
+<link href="assets/css/components.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- ===== 背景层 ===== -->
+<div class="bg-layer" id="bgLayer">
+  <div class="bg-overlay" id="bgOverlay"></div>
+</div>
+
+<!-- ===== 顶栏 ===== -->
+<header class="topbar">
+  <div class="topbar-left">
+    <button aria-label="展开分类" class="icon-btn only-mobile" id="btnSidebarToggle" title="展开分类">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="brand">
+      <span class="brand-mark">导</span>
+      <span class="brand-text">工作导航</span>
+    </div>
+  </div>
+
+  <div class="topbar-center">
+    <div class="search-wrap">
+      <svg class="ico search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input autocomplete="off" class="search-input" id="searchInput" placeholder="搜索站点、网址、标签…  ( 按 / 聚焦 )" spellcheck="false" type="text">
+      <button class="icon-btn search-clear" hidden id="btnSearchClear" title="清空">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <div class="clock" id="clock" title="当前时间">
+      <span class="clock-time" id="clockTime">--:--</span>
+      <span class="clock-date" id="clockDate">----</span>
+    </div>
+    <button class="icon-btn" id="btnTheme" title="切换主题">
+      <svg class="ico ico-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
+      <svg class="ico ico-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+    </button>
+    <button class="icon-btn" id="btnSettings" title="设置">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.1a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>
+    </button>
+    <button class="btn btn-primary" id="btnAddSite">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      <span>添加站点</span>
+    </button>
+    <button class="icon-btn" id="btnSelectMode" title="多选 / 批量操作">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </button>
+    <span class="readonly-badge" hidden id="readonlyBadge">只读快照</span>
+  </div>
+</header>
+
+<!-- ===== 主体 ===== -->
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <nav class="cat-list" id="catList"></nav>
+    <div class="sidebar-foot">
+      <button class="btn btn-ghost btn-block" id="btnAddCategory">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span>新建分类</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-mask" hidden id="sidebarMask"></div>
+
+  <main class="content" id="content">
+    <div class="board" id="board"></div>
+    <div class="empty-state" hidden id="emptyState">
+      <div class="empty-illus">＋</div>
+      <h2>这里还空着</h2>
+      <p>把你的工作站点导入进来，或先手动添加一个。</p>
+      <div class="empty-actions">
+        <button class="btn btn-primary btn-lg" id="btnEmptyImport">从收藏夹导入</button>
+        <button class="btn btn-outline btn-lg" id="btnEmptyAdd">手动添加站点</button>
+      </div>
+      <p class="empty-tip">提示：浏览器菜单里可导出「书签 HTML 文件」，本工具会按文件夹自动生成分类。</p>
+    </div>
+  </main>
+</div>
+
+<!-- ===== 站点编辑弹窗 ===== -->
+<div class="modal" hidden id="siteModal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h3 id="siteModalTitle">添加站点</h3>
+      <button class="icon-btn" data-close title="关闭">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form class="form" id="siteForm" novalidate>
+        <input id="fSiteId" type="hidden">
+        <div class="form-row">
+          <label class="field">
+            <span class="field-label">站点名称 <b class="req">*</b></span>
+            <input autocomplete="off" id="fName" maxlength="30" placeholder="例如：公司 OA" type="text">
+            <span class="field-err" id="errName"></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-label">网址 <b class="req">*</b></span>
+            <input autocomplete="off" id="fUrl" placeholder="https://oa.example.com" spellcheck="false" type="text">
+            <span class="field-err" id="errUrl"></span>
+          </label>
+        </div>
+        <div class="form-row form-row-2">
+          <label class="field">
+            <span class="field-label">归属分类</span>
+            <select id="fCategory"></select>
+          </label>
+          <label class="field">
+            <span class="field-label">打开方式</span>
+            <select id="fOpenIn">
+              <option value="default">跟随全局设置</option>
+              <option value="new">新标签页</option>
+              <option value="self">当前页</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-label">描述 <i class="opt">(选填)</i></span>
+            <input autocomplete="off" id="fDesc" maxlength="60" placeholder="一句话说明这个站点用来做什么" type="text">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-label">图标地址 <i class="opt">(选填，留空自动获取)</i></span>
+            <input autocomplete="off" id="fIcon" placeholder="https://…/favicon.ico" spellcheck="false" type="text">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span class="field-label">标签 <i class="opt">(选填，逗号分隔)</i></span>
+            <input autocomplete="off" id="fTags" placeholder="常用, 内网" type="text">
+          </label>
+        </div>
+        <div class="form-row form-row-inline">
+          <label class="switch">
+            <input id="fPinned" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">置顶显示</span>
+          </label>
+        </div>
+      </form>
+
+      <aside class="preview-pane">
+        <div class="preview-title">实时预览</div>
+        <div class="site-card is-preview" id="previewCard">
+          <div class="card-icon" id="previewIcon"></div>
+          <div class="card-main">
+            <div class="card-name" id="previewName">站点名称</div>
+            <div class="card-desc" id="previewDesc">站点描述</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="btnSaveAndNew">保存并继续添加</button>
+      <div class="foot-right">
+        <button class="btn btn-outline" data-close>取消</button>
+        <button class="btn btn-primary" id="btnSaveSite">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 导入向导弹窗 ===== -->
+<div class="modal" hidden id="importModal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel modal-wide">
+    <div class="modal-head">
+      <h3>从浏览器收藏夹导入</h3>
+      <button class="icon-btn" data-close title="关闭">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <ol class="steps" id="importSteps">
+        <li class="step is-active" data-step="1"><span class="step-no">1</span><span>选择文件</span></li>
+        <li class="step" data-step="2"><span class="step-no">2</span><span>预览结果</span></li>
+        <li class="step" data-step="3"><span class="step-no">3</span><span>确认导入</span></li>
+      </ol>
+
+      <!-- 步骤 1 -->
+      <section class="step-pane" data-pane="1">
+        <div class="dropzone" id="dropzone">
+          <svg class="ico drop-ico" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <p class="drop-title">把书签 HTML 文件拖到这里，或点击选择</p>
+          <p class="drop-sub">支持 Chrome / Edge / Firefox / 360 导出的书签文件</p>
+          <input accept=".html,.htm,text/html" hidden id="fileInput" type="file">
+        </div>
+        <details class="howto">
+          <summary>各浏览器如何导出书签？</summary>
+          <table class="mini-table">
+            <tr><td>Chrome</td><td>书签管理器（Ctrl+Shift+O）→ 右上角 ⋮ → 导出书签</td></tr>
+            <tr><td>Edge</td><td>收藏夹（Ctrl+Shift+O）→ 右上角 … → 导出收藏夹</td></tr>
+            <tr><td>Firefox</td><td>书签库（Ctrl+Shift+O）→ 导入和备份 → 导出书签到 HTML</td></tr>
+            <tr><td>360 浏览器</td><td>收藏夹 → 管理收藏夹 → 导出</td></tr>
+          </table>
+          <p class="note-warn">注：Safari 导出的为 plist 格式，暂不支持。</p>
+        </details>
+        <p class="note-err" hidden id="importErr"></p>
+      </section>
+
+      <!-- 步骤 2 -->
+      <section class="step-pane" data-pane="2" hidden>
+        <div class="stat-row" id="importStats"></div>
+        <div class="tree-wrap">
+          <div class="tree-head">
+            <label class="check">
+              <input checked id="checkAllCats" type="checkbox">
+              <span>全选 / 全不选</span>
+            </label>
+            <span class="tree-hint">取消勾选的分类不会被导入</span>
+          </div>
+          <ul class="tree" id="importTree"></ul>
+        </div>
+      </section>
+
+      <!-- 步骤 3 -->
+      <section class="step-pane" data-pane="3" hidden>
+        <div class="mode-group" id="modeGroup">
+          <label class="mode-card">
+            <input checked name="importMode" type="radio" value="merge">
+            <div class="mode-body">
+              <div class="mode-title">智能合并 <span class="badge-rec">推荐</span></div>
+              <div class="mode-desc">已存在的网址跳过，新网址追加到对应分类，同名分类自动合并</div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input name="importMode" type="radio" value="newonly">
+            <div class="mode-body">
+              <div class="mode-title">仅新增</div>
+              <div class="mode-desc">只导入本地没有的网址，不重复创建同名分类</div>
+            </div>
+          </label>
+          <label class="mode-card is-danger">
+            <input name="importMode" type="radio" value="replace">
+            <div class="mode-body">
+              <div class="mode-title">全量覆盖 <span class="badge-danger">高危</span></div>
+              <div class="mode-desc">清空现有全部分类与站点后再导入，操作不可撤销</div>
+            </div>
+          </label>
+        </div>
+        <div class="confirm-warn" hidden id="replaceWarn">
+          确定要清空当前的站点与分类吗？建议先到「设置 → 数据」导出备份。
+        </div>
+        <div class="stat-row result-row" hidden id="importResult"></div>
+      </section>
+    </div>
+    <div class="modal-foot">
+      <span class="foot-note" id="importFootNote"></span>
+      <div class="foot-right">
+        <button class="btn btn-outline" hidden id="btnImportBack">上一步</button>
+        <button class="btn btn-primary" id="btnImportNext">下一步</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 设置抽屉 ===== -->
+<div class="drawer" hidden id="settingsDrawer">
+  <div class="drawer-mask" data-close></div>
+  <aside class="drawer-panel">
+    <div class="drawer-head">
+      <h3>设置</h3>
+      <button class="icon-btn" data-close title="关闭">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="tabs" id="settingsTabs">
+      <button class="tab is-active" data-tab="appearance">外观</button>
+      <button class="tab" data-tab="background">背景</button>
+      <button class="tab" data-tab="layout">布局</button>
+      <button class="tab" data-tab="behavior">行为</button>
+      <button class="tab" data-tab="data">数据</button>
+    </div>
+    <div class="drawer-body">
+
+      <section class="tab-pane is-active" data-pane="appearance">
+        <div class="setting-group">
+          <div class="setting-title">主题模式</div>
+          <div class="seg" id="segTheme">
+            <button data-val="auto">跟随系统</button>
+            <button data-val="light">亮色</button>
+            <button data-val="dark">暗色</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-pane" data-pane="background">
+        <div class="setting-group">
+          <div class="setting-title">背景类型</div>
+          <div class="seg seg-wrap" id="segBgType">
+            <button data-val="preset">预设壁纸</button>
+            <button data-val="gradient">渐变</button>
+            <button data-val="color">纯色</button>
+            <button data-val="upload">本地上传</button>
+            <button data-val="url">图片链接</button>
+            <button data-val="none">无背景</button>
+          </div>
+        </div>
+
+        <div class="setting-group" id="panePreset">
+          <div class="setting-title">选择壁纸</div>
+          <div class="wallpaper-grid" id="wallpaperGrid"></div>
+        </div>
+
+        <div class="setting-group" hidden id="paneGradient">
+          <div class="setting-title">渐变配色</div>
+          <div class="preset-swatches" id="gradientSwatches"></div>
+          <div class="row-2">
+            <label class="field-inline"><span>起始色</span><input id="gradFrom" type="color" value="#667eea"></label>
+            <label class="field-inline"><span>结束色</span><input id="gradTo" type="color" value="#764ba2"></label>
+          </div>
+          <label class="field"><span class="field-label">角度 <b id="gradAngleVal">135</b>°</span>
+            <input id="gradAngle" max="360" min="0" type="range" value="135">
+          </label>
+        </div>
+
+        <div class="setting-group" hidden id="paneColor">
+          <div class="setting-title">背景颜色</div>
+          <div class="preset-swatches" id="colorSwatches"></div>
+          <label class="field-inline"><span>自定义</span><input id="bgColor" type="color" value="#1e1e2e"></label>
+        </div>
+
+        <div class="setting-group" hidden id="paneUpload">
+          <div class="setting-title">本地图片</div>
+          <p class="note-sub">图片会先在本地压缩后保存，不会上传到任何服务器。</p>
+          <button class="btn btn-outline btn-block" id="btnPickImage">选择本机图片（jpg / png / webp）</button>
+          <input accept="image/*" hidden id="imageInput" type="file">
+          <div class="thumb-list" id="uploadedThumbs"></div>
+          <p class="note-sub" id="uploadHint"></p>
+        </div>
+
+        <div class="setting-group" hidden id="paneUrl">
+          <div class="setting-title">图片链接</div>
+          <input class="text-input" id="bgUrl" placeholder="https://…/wallpaper.jpg" type="text">
+          <button class="btn btn-outline btn-block" id="btnApplyUrl">应用这个链接</button>
+          <p class="note-sub">图片由第三方提供，可能因跨域或失效而无法显示。</p>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-title">显示调节</div>
+          <label class="field">
+            <span class="field-label">模糊程度 <b id="blurVal">0</b> px</span>
+            <input id="bgBlur" max="20" min="0" type="range" value="0">
+          </label>
+          <label class="field">
+            <span class="field-label">遮罩浓度 <b id="overlayVal">15</b>%</span>
+            <input id="bgOverlayRange" max="80" min="0" type="range" value="15">
+          </label>
+          <label class="field">
+            <span class="field-label">填充方式</span>
+            <select id="bgFit">
+              <option value="cover">铺满裁切 (cover)</option>
+              <option value="contain">完整显示 (contain)</option>
+              <option value="repeat">平铺 (repeat)</option>
+            </select>
+          </label>
+          <label class="switch">
+            <input checked id="autoThemeColor" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">从背景图提取主色，用于卡片描边与按钮</span>
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-title">壁纸轮播</div>
+          <label class="switch">
+            <input id="bgRotate" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">每隔一段时间自动切换预设壁纸</span>
+          </label>
+          <label class="field-inline" style="margin-top:10px">
+            <span>间隔</span>
+            <select class="text-input" id="bgRotateMin" style="width:auto; min-width:110px">
+              <option value="1">1 分钟</option>
+              <option selected value="5">5 分钟</option>
+              <option value="10">10 分钟</option>
+              <option value="30">30 分钟</option>
+              <option value="60">1 小时</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="tab-pane" data-pane="layout">
+        <div class="setting-group">
+          <div class="setting-title">排序方式</div>
+          <div class="seg seg-wrap" id="segSortMode">
+            <button data-val="manual">手动排序</button>
+            <button data-val="name">名称</button>
+            <button data-val="clicks">访问量</button>
+            <button data-val="recent">最近访问</button>
+          </div>
+          <p class="note-sub">选「手动排序」才能拖动卡片调整顺序；其它模式按规则自动排。</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">每行卡片数</div>
+          <div class="seg seg-wrap" id="segColumns">
+            <button data-val="auto">自动</button>
+            <button data-val="3">3</button>
+            <button data-val="4">4</button>
+            <button data-val="5">5</button>
+            <button data-val="6">6</button>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">卡片尺寸</div>
+          <div class="seg" id="segCardSize">
+            <button data-val="small">小</button>
+            <button data-val="medium">中</button>
+            <button data-val="large">大</button>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label class="switch">
+            <input checked id="showDesc" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">显示站点描述</span>
+          </label>
+          <label class="switch" style="margin-top:10px">
+            <input id="showTags" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">在卡片上显示标签（点击标签即筛选）</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="tab-pane" data-pane="behavior">
+        <div class="setting-group">
+          <div class="setting-title">默认打开方式</div>
+          <div class="seg" id="segOpenIn">
+            <button data-val="new">新标签页</button>
+            <button data-val="self">当前页</button>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label class="switch">
+            <input checked id="showClock" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">在顶栏显示时间</span>
+          </label>
+          <label class="switch">
+            <input id="allowFaviconFetch" type="checkbox">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">联网抓取站点图标（会向第三方域名发起请求）</span>
+          </label>
+          <p class="note-sub">关闭时仅使用本地图标或首字母色块，保证全程离线、不外发任何数据。</p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">站内搜不到时，跳转搜索引擎</div>
+          <label class="field-inline">
+            <span>默认引擎</span>
+            <select class="text-input" id="searchEngine" style="width:auto; min-width:120px">
+              <option value="baidu">百度</option>
+              <option value="bing">必应</option>
+              <option value="google">Google</option>
+            </select>
+          </label>
+          <p class="note-sub">只在点「没有找到匹配的站点」里的按钮时才跳转，不会自动发请求。</p>
+        </div>
+      </section>
+
+      <section class="tab-pane" data-pane="data">
+        <div class="setting-group">
+          <div class="setting-title">备份与恢复</div>
+          <p class="note-sub">数据保存在本浏览器中。清理浏览器数据、更换电脑或浏览器都会导致数据丢失，请定期导出备份。</p>
+          <button class="btn btn-primary btn-block" id="btnExport">导出 JSON 备份</button>
+          <button class="btn btn-outline btn-block" id="btnImportJson">导入 JSON 备份</button>
+          <input accept=".json,application/json" hidden id="jsonInput" type="file">
+          <button class="btn btn-outline btn-block" id="btnRollback">回滚到上一次修改前</button>
+          <p class="note-sub" id="rollbackHint"></p>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">分享给同事（只读快照）</div>
+          <p class="note-sub">把当前的站点数据烤进一个独立的 HTML 文件，别人打开就能看，但改不了。适合发到群里或放进共享盘。</p>
+          <button class="btn btn-primary btn-block" id="btnSnapshot">导出只读快照 HTML</button>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">统计</div>
+          <div class="stat-mini" id="dataStats"></div>
+          <button class="btn btn-outline btn-block" id="btnStats" style="margin-top:10px">查看访问统计</button>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">回收站</div>
+          <p class="note-sub" id="trashHint">回收站是空的。</p>
+          <div class="trash-list" id="trashList"></div>
+          <button class="btn btn-outline btn-block" id="btnEmptyTrash" style="margin-top:10px">清空回收站</button>
+        </div>
+        <div class="setting-group is-danger">
+          <div class="setting-title">危险操作</div>
+          <button class="btn btn-danger btn-block" id="btnClearAll">清空所有数据</button>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+</div>
+
+<!-- ===== 右键菜单 ===== -->
+<div class="context-menu" hidden id="contextMenu">
+  <button data-act="open">打开</button>
+  <button data-act="opennew">在新标签页打开</button>
+  <button data-act="copy">复制链接</button>
+  <button data-act="pin">置顶 / 取消置顶</button>
+  <button data-act="edit">编辑</button>
+  <button class="is-danger" data-act="delete">删除</button>
+</div>
+
+<!-- ===== 确认对话框 ===== -->
+<div class="modal" hidden id="confirmModal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel modal-sm">
+    <div class="modal-head"><h3 id="confirmTitle">确认操作</h3></div>
+    <div class="modal-body"><p class="confirm-text" id="confirmText"></p></div>
+    <div class="modal-foot">
+      <div class="foot-right">
+        <button class="btn btn-outline" data-close>取消</button>
+        <button class="btn btn-danger" id="confirmOk">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 访问统计 ===== -->
+<div class="modal" hidden id="statsModal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel modal-wide">
+    <div class="modal-head">
+      <h3>访问统计</h3>
+      <button class="icon-btn" data-close title="关闭">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="statsPanel"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 多选工具条 ===== -->
+<div class="select-bar" hidden id="selectBar">
+  <span class="sel-count" id="selCount">已选 0 个</span>
+  <button class="btn btn-ghost btn-sm" id="selAll">全选</button>
+  <select class="text-input select-sm" id="selCategory"></select>
+  <button class="btn btn-ghost btn-sm" id="selMove">移动</button>
+  <button class="btn btn-ghost btn-sm" id="selPin">置顶</button>
+  <button class="btn btn-ghost btn-sm is-danger" id="selDelete">删除</button>
+  <button class="btn btn-outline btn-sm" id="selExit">退出</button>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script defer src="assets/js/utils.js"></script>
+<script defer src="assets/js/storage.js"></script>
+<script defer src="assets/js/store.js"></script>
+<script defer src="assets/js/pinyin.js"></script>
+<script defer src="assets/js/background.js"></script>
+<script defer src="assets/js/bookmark.js"></script>
+<script defer src="assets/js/render.js"></script>
+<script defer src="assets/js/app.js"></script>
+</body>
+</html>

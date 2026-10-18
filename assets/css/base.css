@@ -1,0 +1,165 @@
+/* ============================================================
+   base.css — 变量体系 / 主题 / 重置
+   ============================================================ */
+
+/* ---------- 亮色主题（默认） ---------- */
+:root {
+  --bg: #f4f6fb;
+  --bg-elevated: #ffffff;
+
+  --card-bg: rgba(255, 255, 255, 0.82);
+  --card-bg-hover: rgba(255, 255, 255, 0.95);
+  --card-border: rgba(15, 23, 42, 0.07);
+  --card-border-hover: rgba(76, 110, 245, 0.35);
+  --card-shadow: 0 4px 16px rgba(15, 23, 42, 0.07);
+  --card-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.13);
+
+  --sidebar-bg: rgba(255, 255, 255, 0.66);
+  --topbar-bg: rgba(255, 255, 255, 0.72);
+
+  --text: #16203a;
+  --text-2: #4d5875;
+  --text-3: #8891a8;
+
+  --accent: #4c6ef5;
+  --accent-soft: rgba(76, 110, 245, 0.12);
+  --accent-text: #ffffff;
+
+  --danger: #e5484d;
+  --danger-soft: rgba(229, 72, 77, 0.1);
+  --success: #30a46c;
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.1);
+
+  --divider: rgba(15, 23, 42, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: rgba(15, 23, 42, 0.14);
+
+  --overlay-color: 255, 255, 255;
+  --blur-amount: 12px;
+
+  --r-card: 12px;
+  --r-btn: 8px;
+  --r-sm: 6px;
+
+  --sp: 8px;
+  --topbar-h: 62px;
+  --sidebar-w: 228px;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --trans: all 0.2s var(--ease);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---------- 暗色主题 ---------- */
+[data-theme="dark"] {
+  --bg: #0f1424;
+  --bg-elevated: #1a2135;
+
+  --card-bg: rgba(30, 38, 60, 0.72);
+  --card-bg-hover: rgba(40, 50, 78, 0.88);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-border-hover: rgba(110, 140, 255, 0.45);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --card-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.45);
+
+  --sidebar-bg: rgba(22, 29, 48, 0.7);
+  --topbar-bg: rgba(18, 24, 40, 0.75);
+
+  --text: #eef1f8;
+  --text-2: #a7b0c8;
+  --text-3: #6f7893;
+
+  --accent: #6e8cff;
+  --accent-soft: rgba(110, 140, 255, 0.16);
+  --accent-text: #ffffff;
+
+  --danger: #ff6b6f;
+  --danger-soft: rgba(255, 107, 111, 0.14);
+  --success: #4ade80;
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+
+  --divider: rgba(255, 255, 255, 0.09);
+  --input-bg: rgba(12, 17, 30, 0.6);
+  --input-border: rgba(255, 255, 255, 0.14);
+
+  --overlay-color: 0, 0, 0;
+}
+
+/* ---------- 重置 ---------- */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+h1, h2, h3, h4, p, ul, ol, figure { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+a { color: inherit; text-decoration: none; }
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; border: none; background: none; }
+
+/* ---------- 图标 ---------- */
+.ico {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ---------- 滚动条 ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 140, 0.35);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 140, 0.6); }
+
+/* ---------- 通用工具类 ---------- */
+[hidden] { display: none !important; }
+
+.only-mobile { display: none; }
+
+@media (max-width: 1023px) {
+  .only-mobile { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* 选区颜色 */
+::selection { background: var(--accent-soft); }
+
+/* 焦点可见性（键盘导航） */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
