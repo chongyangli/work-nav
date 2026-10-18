@@ -103,6 +103,15 @@ work-nav/
 
 改完代码刷新页面即可，没有编译步骤。开发文档（`docs/开发文档.md`）里写了模块职责、数据结构、数据迁移策略，以及踩过的坑，动手前值得先扫一遍。
 
+```bash
+git clone git@github.com:chongyangli/work-nav.git   # 推荐，SSH
+git clone https://github.com/chongyangli/work-nav.git
+```
+
+本地起个静态服务就能跑（如 `python -m http.server 8080`）；直接双击 `index.html` 也能用，只是 `manifest.webmanifest` 在 `file://` 下不生效。
+
+仓库统一使用 LF 行尾（见 `.gitattributes`），提交前无需手动处理。
+
 ## 许可
 
 [MIT](LICENSE) © 2026 chongyangli
