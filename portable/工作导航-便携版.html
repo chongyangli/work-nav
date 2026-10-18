@@ -960,6 +960,9 @@ input[type="range"]::-moz-range-thumb {
 .modal-body > .form { flex: 1; min-width: 0; }
 .modal-body > .step-pane { width: 100%; }
 
+/* 纵向排布：导入向导的步骤条、访问统计等内容需要占满整行 */
+.modal-body.is-stack { flex-direction: column; gap: 0; }
+
 .modal-foot {
   flex: none;
   display: flex;
@@ -1632,9 +1635,42 @@ body.is-readonly .section-add { display: none !important; }
 /* ---------- 搜不到时的动作区 ---------- */
 .no-result-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
 
+/* ---------- 弹窗内的辅助入口条（添加站点 → 从书签导入） ---------- */
+.modal-tip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--divider);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.modal-tip .ico { width: 15px; height: 15px; flex: none; color: var(--accent); }
+.modal-tip-text { min-width: 0; }
+
+.link-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0 1px;
+  font: inherit;
+  font-weight: 650;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.link-btn:hover { opacity: 0.78; }
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 @media (max-width: 767px) {
   .bar-name { width: 84px; }
   .select-bar { bottom: 12px; padding: 8px 10px; gap: 6px; }
+  .modal-tip { padding: 9px 14px; font-size: 12px; }
 }
 </style>
 </head>
@@ -1729,6 +1765,10 @@ body.is-readonly .section-add { display: none !important; }
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
+    <div class="modal-tip" id="siteImportTip">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l2 2h7a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 18 19H5.5A1.5 1.5 0 0 1 4 17.5z"/><path d="M9 13.5h6M12 10.5v6"/></svg>
+      <span class="modal-tip-text">要一次添加多个站点？<button class="link-btn" id="btnImportFromBookmark" type="button">从浏览器书签导入</button>，会自动按书签文件夹生成分类。</span>
+    </div>
     <div class="modal-body">
       <form class="form" id="siteForm" novalidate>
         <input id="fSiteId" type="hidden">
@@ -1818,7 +1858,7 @@ body.is-readonly .section-add { display: none !important; }
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body is-stack">
       <ol class="steps" id="importSteps">
         <li class="step is-active" data-step="1"><span class="step-no">1</span><span>选择文件</span></li>
         <li class="step" data-step="2"><span class="step-no">2</span><span>预览结果</span></li>
@@ -2178,7 +2218,7 @@ body.is-readonly .section-add { display: none !important; }
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body is-stack">
       <div id="statsPanel"></div>
     </div>
   </div>
@@ -6082,6 +6122,7 @@ body.is-readonly .section-add { display: none !important; }
 
     clearFieldErrors();
     $('#btnSaveAndNew').hidden = !!editingSiteId;
+    $('#siteImportTip').hidden = !!editingSiteId;
     updatePreview();
     openModal('siteModal');
 
@@ -7602,6 +7643,12 @@ body.is-readonly .section-add { display: none !important; }
     /* ---------- 站点表单 ---------- */
     bind('#btnSaveSite', 'click', () => saveSiteForm(false));
     bind('#btnSaveAndNew', 'click', () => saveSiteForm(true));
+
+    // 添加站点弹窗内的「从浏览器书签导入」入口：关闭本弹窗，接续导入向导
+    bind('#btnImportFromBookmark', 'click', () => {
+      closeModal('siteModal');
+      openImport();
+    });
 
     bind('#siteForm', 'submit', (e) => {
       e.preventDefault();

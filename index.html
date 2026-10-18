@@ -108,6 +108,10 @@
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
+    <div class="modal-tip" id="siteImportTip">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l2 2h7a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 18 19H5.5A1.5 1.5 0 0 1 4 17.5z"/><path d="M9 13.5h6M12 10.5v6"/></svg>
+      <span class="modal-tip-text">要一次添加多个站点？<button class="link-btn" id="btnImportFromBookmark" type="button">从浏览器书签导入</button>，会自动按书签文件夹生成分类。</span>
+    </div>
     <div class="modal-body">
       <form class="form" id="siteForm" novalidate>
         <input id="fSiteId" type="hidden">
@@ -197,7 +201,7 @@
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body is-stack">
       <ol class="steps" id="importSteps">
         <li class="step is-active" data-step="1"><span class="step-no">1</span><span>选择文件</span></li>
         <li class="step" data-step="2"><span class="step-no">2</span><span>预览结果</span></li>
@@ -557,7 +561,7 @@
         <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body is-stack">
       <div id="statsPanel"></div>
     </div>
   </div>

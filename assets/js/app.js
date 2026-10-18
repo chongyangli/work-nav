@@ -190,6 +190,7 @@
 
     clearFieldErrors();
     $('#btnSaveAndNew').hidden = !!editingSiteId;
+    $('#siteImportTip').hidden = !!editingSiteId;
     updatePreview();
     openModal('siteModal');
 
@@ -1710,6 +1711,12 @@
     /* ---------- 站点表单 ---------- */
     bind('#btnSaveSite', 'click', () => saveSiteForm(false));
     bind('#btnSaveAndNew', 'click', () => saveSiteForm(true));
+
+    // 添加站点弹窗内的「从浏览器书签导入」入口：关闭本弹窗，接续导入向导
+    bind('#btnImportFromBookmark', 'click', () => {
+      closeModal('siteModal');
+      openImport();
+    });
 
     bind('#siteForm', 'submit', (e) => {
       e.preventDefault();
