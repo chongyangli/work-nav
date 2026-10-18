@@ -214,14 +214,36 @@
     const ui = global.Store.state.ui;
     const frag = document.createDocumentFragment();
 
-    // 系统分类
+    // 系统分类（「未分类」的名字取自设置，可重命名）
+    const readonly = global.Store.isReadOnly();
     const sys = [
       { id: 'all', name: '全部站点', icon: '📚', count: st.sites },
       { id: 'pinned', name: '常用置顶', icon: '📌', count: st.pinned },
-      { id: 'unclassified', name: '未分类', icon: '📥', count: st.uncategorized },
+      {
+        id: 'unclassified',
+        name: global.Store.uncategorizedName(),
+        icon: '📥',
+        count: st.uncategorized,
+        more: true,
+      },
     ];
 
     sys.forEach((s) => {
+      const children = [
+        U.el('span', { class: 'cat-ico', text: s.icon }),
+        U.el('span', { class: 'cat-name', text: s.name }),
+        U.el('span', { class: 'cat-count', text: String(s.count) }),
+      ];
+      if (s.more && !readonly) {
+        children.push(
+          U.el('button', {
+            class: 'cat-more is-always',
+            title: '分组操作（重命名）',
+            text: '⋯',
+            dataset: { more: s.id },
+          })
+        );
+      }
       frag.appendChild(
         U.el(
           'div',
@@ -231,16 +253,11 @@
             role: 'button',
             tabindex: '0',
           },
-          [
-            U.el('span', { class: 'cat-ico', text: s.icon }),
-            U.el('span', { class: 'cat-name', text: s.name }),
-            U.el('span', { class: 'cat-count', text: String(s.count) }),
-          ]
+          children
         )
       );
     });
 
-    const readonly = global.Store.isReadOnly();
     const tree = global.Store.categoryTree();
     if (tree.length) {
       frag.appendChild(U.el('div', { class: 'cat-sep' }));
@@ -459,7 +476,12 @@
 
       const unc = global.Store.uncategorizedSites();
       if (unc.length) {
-        groups.push({ id: 'unclassified', name: '未分类', icon: '📥', sites: unc });
+        groups.push({
+          id: 'unclassified',
+          name: global.Store.uncategorizedName(),
+          icon: '📥',
+          sites: unc,
+        });
       }
       return groups;
     }
@@ -469,7 +491,14 @@
     }
 
     if (activeCategory === 'unclassified') {
-      return [{ id: 'unclassified', name: '未分类', icon: '📥', sites: global.Store.uncategorizedSites() }];
+      return [
+        {
+          id: 'unclassified',
+          name: global.Store.uncategorizedName(),
+          icon: '📥',
+          sites: global.Store.uncategorizedSites(),
+        },
+      ];
     }
 
     // 指定分类

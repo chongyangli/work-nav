@@ -764,6 +764,26 @@
     return { ok: true };
   }
 
+  /**
+   * 「未分类」是虚拟分组，不在 categories 里，
+   * 因此它的显示名存进 settings.layout.uncategorizedName
+   */
+  function uncategorizedName() {
+    const layout = (state.data.settings && state.data.settings.layout) || {};
+    const name = typeof layout.uncategorizedName === 'string' ? layout.uncategorizedName.trim() : '';
+    return name || '未分类';
+  }
+
+  function setUncategorizedName(name) {
+    const v = String(name == null ? '' : name).trim().slice(0, 20);
+    if (!v) return { ok: false, message: '名称不能为空' };
+    updateSettings(
+      { layout: Object.assign({}, state.data.settings.layout, { uncategorizedName: v }) },
+      'settings:uncategorized-name'
+    );
+    return { ok: true, name: v };
+  }
+
   function updateBackground(patch) {
     commit((d) => {
       d.settings.background = Object.assign({}, d.settings.background, patch);
@@ -886,6 +906,8 @@
     childCategories,
     sitesOfCategory,
     uncategorizedSites,
+    uncategorizedName,
+    setUncategorizedName,
     pinnedSites,
     siteSorter,
     categoryTree,

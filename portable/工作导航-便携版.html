@@ -10,8 +10,8 @@
 <meta content="把 OA、GitLab、监控大盘、内部 Wiki 收进一个页面，支持收藏夹导入、拼音搜索与自定义壁纸。" property="og:description">
 <meta content="summary" name="twitter:card">
 <title>工作导航 · 便携版</title>
-<link href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM2NjdlZWEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNzY0YmEyIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0idXJsKCNnKSIvPgogIDxnIGZpbGw9IiNmZmZmZmYiPgogICAgPHJlY3QgeD0iMTUiIHk9IjE1IiB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHJ4PSI0IiBvcGFjaXR5PSIwLjk1Ii8+CiAgICA8cmVjdCB4PSIzNSIgeT0iMTUiIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgcng9IjQiIG9wYWNpdHk9IjAuNzUiLz4KICAgIDxyZWN0IHg9IjE1IiB5PSIzNSIgd2lkdGg9IjE0IiBoZWlnaHQ9IjE0IiByeD0iNCIgb3BhY2l0eT0iMC43NSIvPgogICAgPHJlY3QgeD0iMzUiIHk9IjM1IiB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHJ4PSI0IiBvcGFjaXR5PSIwLjU1Ii8+CiAgPC9nPgo8L3N2Zz4K" rel="icon" type="image/svg+xml">
 <style>
+/* ===== base.css ===== */
 /* ============================================================
    base.css — 变量体系 / 主题 / 重置
    ============================================================ */
@@ -177,7 +177,9 @@ button { cursor: pointer; border: none; background: none; }
   outline-offset: 2px;
   border-radius: 4px;
 }
-
+</style>
+<style>
+/* ===== layout.css ===== */
 /* ============================================================
    layout.css — 背景层 / 顶栏 / 侧栏 / 内容区 / 卡片网格
    ============================================================ */
@@ -373,6 +375,9 @@ button { cursor: pointer; border: none; background: none; }
 }
 .cat-item:hover .cat-more { opacity: 0.7; }
 .cat-item .cat-more:hover { background: rgba(128, 128, 140, 0.25); opacity: 1; }
+/* 「未分类」等虚拟分组的操作入口常驻可见，否则用户找不到 */
+.cat-item .cat-more.is-always { opacity: 0.4; }
+.cat-item:hover .cat-more.is-always { opacity: 0.85; }
 
 /* 二级分类缩进 */
 .cat-item.is-sub { padding-left: 26px; font-size: 13px; }
@@ -671,7 +676,9 @@ button { cursor: pointer; border: none; background: none; }
   .empty-actions { flex-direction: column; }
   .empty-actions .btn { width: 100%; }
 }
-
+</style>
+<style>
+/* ===== components.css ===== */
 /* ============================================================
    components.css — 按钮 / 表单 / 弹窗 / 抽屉 / 其他组件
    ============================================================ */
@@ -1629,7 +1636,6 @@ body.is-readonly .section-add { display: none !important; }
   .bar-name { width: 84px; }
   .select-bar { bottom: 12px; padding: 8px 10px; gap: 6px; }
 }
-
 </style>
 </head>
 <body>
@@ -2193,6 +2199,7 @@ body.is-readonly .section-add { display: none !important; }
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
+/* ===== utils.js ===== */
 /* ============================================================
    utils.js — 通用工具函数
    ============================================================ */
@@ -2506,7 +2513,9 @@ body.is-readonly .section-add { display: none !important; }
     fileSize,
   };
 })(window);
-
+</script>
+<script>
+/* ===== storage.js ===== */
 /* ============================================================
    storage.js — localStorage + IndexedDB 封装
    - 结构化数据：localStorage（体积小、读写快）
@@ -2606,6 +2615,7 @@ body.is-readonly .section-add { display: none !important; }
       showDescription: true,
       sortMode: 'manual',
       showTags: true,
+      uncategorizedName: '未分类',
     },
     behavior: {
       defaultOpenIn: 'new',
@@ -2727,6 +2737,9 @@ body.is-readonly .section-add { display: none !important; }
     if (['auto', 'light', 'dark'].indexOf(out.theme) < 0) out.theme = 'auto';
     if (['manual', 'name', 'clicks', 'recent'].indexOf(out.layout.sortMode) < 0) out.layout.sortMode = 'manual';
     if (['baidu', 'bing', 'google'].indexOf(out.behavior.searchEngine) < 0) out.behavior.searchEngine = 'baidu';
+    // 「未分类」是虚拟分组，名字存在设置里，需要校验非空
+    const unc = typeof out.layout.uncategorizedName === 'string' ? out.layout.uncategorizedName.trim() : '';
+    out.layout.uncategorizedName = unc ? unc.slice(0, 20) : '未分类';
     return out;
   }
 
@@ -3038,7 +3051,9 @@ body.is-readonly .section-add { display: none !important; }
     _tx: tx,
   };
 })(window);
-
+</script>
+<script>
+/* ===== store.js ===== */
 /* ============================================================
    store.js — 状态管理（单一数据源 + 订阅刷新）
    ============================================================ */
@@ -3805,6 +3820,26 @@ body.is-readonly .section-add { display: none !important; }
     return { ok: true };
   }
 
+  /**
+   * 「未分类」是虚拟分组，不在 categories 里，
+   * 因此它的显示名存进 settings.layout.uncategorizedName
+   */
+  function uncategorizedName() {
+    const layout = (state.data.settings && state.data.settings.layout) || {};
+    const name = typeof layout.uncategorizedName === 'string' ? layout.uncategorizedName.trim() : '';
+    return name || '未分类';
+  }
+
+  function setUncategorizedName(name) {
+    const v = String(name == null ? '' : name).trim().slice(0, 20);
+    if (!v) return { ok: false, message: '名称不能为空' };
+    updateSettings(
+      { layout: Object.assign({}, state.data.settings.layout, { uncategorizedName: v }) },
+      'settings:uncategorized-name'
+    );
+    return { ok: true, name: v };
+  }
+
   function updateBackground(patch) {
     commit((d) => {
       d.settings.background = Object.assign({}, d.settings.background, patch);
@@ -3927,6 +3962,8 @@ body.is-readonly .section-add { display: none !important; }
     childCategories,
     sitesOfCategory,
     uncategorizedSites,
+    uncategorizedName,
+    setUncategorizedName,
     pinnedSites,
     siteSorter,
     categoryTree,
@@ -3974,7 +4011,9 @@ body.is-readonly .section-add { display: none !important; }
     exportData,
   };
 })(window);
-
+</script>
+<script>
+/* ===== pinyin.js ===== */
 /* ============================================================
    pinyin.js — 汉字 → 拼音首字母映射
    目的：输入 "tx" 能命中「腾讯文档」
@@ -4084,7 +4123,9 @@ body.is-readonly .section-add { display: none !important; }
     _build: buildMap,
   };
 })(window);
-
+</script>
+<script>
+/* ===== background.js ===== */
 /* ============================================================
    background.js — 背景系统
    - 预设壁纸（纯 CSS 渐变生成，零文件依赖）
@@ -4626,7 +4667,9 @@ body.is-readonly .section-add { display: none !important; }
     MAX_INPUT_BYTES,
   };
 })(window);
-
+</script>
+<script>
+/* ===== bookmark.js ===== */
 /* ============================================================
    bookmark.js — 浏览器书签 HTML 解析
    格式：Netscape Bookmark File Format
@@ -4924,7 +4967,9 @@ body.is-readonly .section-add { display: none !important; }
     isRootName,
   };
 })(window);
-
+</script>
+<script>
+/* ===== render.js ===== */
 /* ============================================================
    render.js — 视图渲染
    全量重绘策略：数据量（千级以内）下足够快，逻辑简单不易出错
@@ -5141,14 +5186,36 @@ body.is-readonly .section-add { display: none !important; }
     const ui = global.Store.state.ui;
     const frag = document.createDocumentFragment();
 
-    // 系统分类
+    // 系统分类（「未分类」的名字取自设置，可重命名）
+    const readonly = global.Store.isReadOnly();
     const sys = [
       { id: 'all', name: '全部站点', icon: '📚', count: st.sites },
       { id: 'pinned', name: '常用置顶', icon: '📌', count: st.pinned },
-      { id: 'unclassified', name: '未分类', icon: '📥', count: st.uncategorized },
+      {
+        id: 'unclassified',
+        name: global.Store.uncategorizedName(),
+        icon: '📥',
+        count: st.uncategorized,
+        more: true,
+      },
     ];
 
     sys.forEach((s) => {
+      const children = [
+        U.el('span', { class: 'cat-ico', text: s.icon }),
+        U.el('span', { class: 'cat-name', text: s.name }),
+        U.el('span', { class: 'cat-count', text: String(s.count) }),
+      ];
+      if (s.more && !readonly) {
+        children.push(
+          U.el('button', {
+            class: 'cat-more is-always',
+            title: '分组操作（重命名）',
+            text: '⋯',
+            dataset: { more: s.id },
+          })
+        );
+      }
       frag.appendChild(
         U.el(
           'div',
@@ -5158,16 +5225,11 @@ body.is-readonly .section-add { display: none !important; }
             role: 'button',
             tabindex: '0',
           },
-          [
-            U.el('span', { class: 'cat-ico', text: s.icon }),
-            U.el('span', { class: 'cat-name', text: s.name }),
-            U.el('span', { class: 'cat-count', text: String(s.count) }),
-          ]
+          children
         )
       );
     });
 
-    const readonly = global.Store.isReadOnly();
     const tree = global.Store.categoryTree();
     if (tree.length) {
       frag.appendChild(U.el('div', { class: 'cat-sep' }));
@@ -5386,7 +5448,12 @@ body.is-readonly .section-add { display: none !important; }
 
       const unc = global.Store.uncategorizedSites();
       if (unc.length) {
-        groups.push({ id: 'unclassified', name: '未分类', icon: '📥', sites: unc });
+        groups.push({
+          id: 'unclassified',
+          name: global.Store.uncategorizedName(),
+          icon: '📥',
+          sites: unc,
+        });
       }
       return groups;
     }
@@ -5396,7 +5463,14 @@ body.is-readonly .section-add { display: none !important; }
     }
 
     if (activeCategory === 'unclassified') {
-      return [{ id: 'unclassified', name: '未分类', icon: '📥', sites: global.Store.uncategorizedSites() }];
+      return [
+        {
+          id: 'unclassified',
+          name: global.Store.uncategorizedName(),
+          icon: '📥',
+          sites: global.Store.uncategorizedSites(),
+        },
+      ];
     }
 
     // 指定分类
@@ -5813,7 +5887,9 @@ body.is-readonly .section-add { display: none !important; }
     setSegActive,
   };
 })(window);
-
+</script>
+<script>
+/* ===== app.js ===== */
 /* ============================================================
    app.js — 应用入口：事件绑定与流程编排
    ============================================================ */
@@ -5962,7 +6038,7 @@ body.is-readonly .section-add { display: none !important; }
     const sel = $('#fCategory');
     if (!sel) return;
     sel.textContent = '';
-    sel.appendChild(U.el('option', { value: '', text: '未分类' }));
+    sel.appendChild(U.el('option', { value: '', text: global.Store.uncategorizedName() }));
     global.Store.categoryTree().forEach((node) => {
       sel.appendChild(U.el('option', { value: node.cat.id, text: node.cat.name }));
       node.children.forEach((c) => {
@@ -6165,6 +6241,30 @@ body.is-readonly .section-add { display: none !important; }
   }
 
   async function openCategoryMenu(catId, anchorEl) {
+    // 「未分类」是虚拟分组：没有 categories 记录，但仍允许改名
+    if (catId === 'unclassified') {
+      const cur = global.Store.uncategorizedName();
+      showMenuAt(
+        anchorEl,
+        [
+          { label: '重命名分组', act: 'rename' },
+          { label: '在此分组添加站点', act: 'addsite' },
+        ],
+        async (act) => {
+          if (act === 'rename') {
+            const name = global.prompt('重命名分组（当前：' + cur + '）', cur);
+            if (name === null) return;
+            const r = global.Store.setUncategorizedName(name);
+            if (r.ok) toast('已重命名为「' + r.name + '」', 'success');
+            else toast(r.message || '重命名失败', 'error');
+          } else if (act === 'addsite') {
+            openSiteModal(null, '');
+          }
+        }
+      );
+      return;
+    }
+
     const cat = global.Store.getCategory(catId);
     if (!cat) return;
 
@@ -6191,14 +6291,17 @@ body.is-readonly .section-add { display: none !important; }
         const detail =
           '分类「' + cat.name + '」下有 ' + affected + ' 个站点' +
           (childCount ? '，以及 ' + childCount + ' 个子分类' : '') +
-          '。\n\n删除后这些站点会变为「未分类」，不会丢失。';
+          '。\n\n删除后这些站点会变为「' + global.Store.uncategorizedName() + '」，不会丢失。';
 
         const ok = await confirm('删除分类', detail, '删除');
         if (!ok) return;
         const r = global.Store.deleteCategory(cat.id, 'move-to-uncategorized');
         if (r.ok) {
           if (global.Store.state.ui.activeCategory === cat.id) global.Store.setActiveCategory('all');
-          toast('已删除分类，其中 ' + r.affected + ' 个站点已移到「未分类」', 'success');
+          toast(
+            '已删除分类，其中 ' + r.affected + ' 个站点已移到「' + global.Store.uncategorizedName() + '」',
+            'success'
+          );
         }
       }
     });
@@ -6991,7 +7094,7 @@ body.is-readonly .section-add { display: none !important; }
     const sel = $('#selCategory');
     if (!sel) return;
     sel.textContent = '';
-    sel.appendChild(U.el('option', { value: '', text: '移动到…未分类' }));
+    sel.appendChild(U.el('option', { value: '', text: '移动到…' + global.Store.uncategorizedName() }));
     global.Store.categoryTree().forEach((node) => {
       sel.appendChild(U.el('option', { value: node.cat.id, text: node.cat.name }));
       node.children.forEach((c) => {
@@ -7269,7 +7372,7 @@ body.is-readonly .section-add { display: none !important; }
         const sel = $('#selCategory');
         const target = sel ? sel.value : '';
         const r = global.Store.batchMove(Array.from(ui.selected), target);
-        const name = target ? (global.Store.getCategory(target) || {}).name : '未分类';
+        const name = target ? (global.Store.getCategory(target) || {}).name : global.Store.uncategorizedName();
         toast('已把 ' + r.count + ' 个站点移动到「' + name + '」', 'success');
         return;
       }
@@ -7799,7 +7902,6 @@ body.is-readonly .section-add { display: none !important; }
   // 暴露给控制台调试
   global.Nav = { toast, confirm, openSiteModal, openImport, closeModal };
 })(window);
-
 </script>
 </body>
 </html>

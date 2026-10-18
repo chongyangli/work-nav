@@ -146,7 +146,7 @@
     const sel = $('#fCategory');
     if (!sel) return;
     sel.textContent = '';
-    sel.appendChild(U.el('option', { value: '', text: '未分类' }));
+    sel.appendChild(U.el('option', { value: '', text: global.Store.uncategorizedName() }));
     global.Store.categoryTree().forEach((node) => {
       sel.appendChild(U.el('option', { value: node.cat.id, text: node.cat.name }));
       node.children.forEach((c) => {
@@ -349,6 +349,30 @@
   }
 
   async function openCategoryMenu(catId, anchorEl) {
+    // 「未分类」是虚拟分组：没有 categories 记录，但仍允许改名
+    if (catId === 'unclassified') {
+      const cur = global.Store.uncategorizedName();
+      showMenuAt(
+        anchorEl,
+        [
+          { label: '重命名分组', act: 'rename' },
+          { label: '在此分组添加站点', act: 'addsite' },
+        ],
+        async (act) => {
+          if (act === 'rename') {
+            const name = global.prompt('重命名分组（当前：' + cur + '）', cur);
+            if (name === null) return;
+            const r = global.Store.setUncategorizedName(name);
+            if (r.ok) toast('已重命名为「' + r.name + '」', 'success');
+            else toast(r.message || '重命名失败', 'error');
+          } else if (act === 'addsite') {
+            openSiteModal(null, '');
+          }
+        }
+      );
+      return;
+    }
+
     const cat = global.Store.getCategory(catId);
     if (!cat) return;
 
@@ -375,14 +399,17 @@
         const detail =
           '分类「' + cat.name + '」下有 ' + affected + ' 个站点' +
           (childCount ? '，以及 ' + childCount + ' 个子分类' : '') +
-          '。\n\n删除后这些站点会变为「未分类」，不会丢失。';
+          '。\n\n删除后这些站点会变为「' + global.Store.uncategorizedName() + '」，不会丢失。';
 
         const ok = await confirm('删除分类', detail, '删除');
         if (!ok) return;
         const r = global.Store.deleteCategory(cat.id, 'move-to-uncategorized');
         if (r.ok) {
           if (global.Store.state.ui.activeCategory === cat.id) global.Store.setActiveCategory('all');
-          toast('已删除分类，其中 ' + r.affected + ' 个站点已移到「未分类」', 'success');
+          toast(
+            '已删除分类，其中 ' + r.affected + ' 个站点已移到「' + global.Store.uncategorizedName() + '」',
+            'success'
+          );
         }
       }
     });
@@ -1175,7 +1202,7 @@
     const sel = $('#selCategory');
     if (!sel) return;
     sel.textContent = '';
-    sel.appendChild(U.el('option', { value: '', text: '移动到…未分类' }));
+    sel.appendChild(U.el('option', { value: '', text: '移动到…' + global.Store.uncategorizedName() }));
     global.Store.categoryTree().forEach((node) => {
       sel.appendChild(U.el('option', { value: node.cat.id, text: node.cat.name }));
       node.children.forEach((c) => {
@@ -1453,7 +1480,7 @@
         const sel = $('#selCategory');
         const target = sel ? sel.value : '';
         const r = global.Store.batchMove(Array.from(ui.selected), target);
-        const name = target ? (global.Store.getCategory(target) || {}).name : '未分类';
+        const name = target ? (global.Store.getCategory(target) || {}).name : global.Store.uncategorizedName();
         toast('已把 ' + r.count + ' 个站点移动到「' + name + '」', 'success');
         return;
       }

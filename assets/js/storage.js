@@ -97,6 +97,7 @@
       showDescription: true,
       sortMode: 'manual',
       showTags: true,
+      uncategorizedName: '未分类',
     },
     behavior: {
       defaultOpenIn: 'new',
@@ -218,6 +219,9 @@
     if (['auto', 'light', 'dark'].indexOf(out.theme) < 0) out.theme = 'auto';
     if (['manual', 'name', 'clicks', 'recent'].indexOf(out.layout.sortMode) < 0) out.layout.sortMode = 'manual';
     if (['baidu', 'bing', 'google'].indexOf(out.behavior.searchEngine) < 0) out.behavior.searchEngine = 'baidu';
+    // 「未分类」是虚拟分组，名字存在设置里，需要校验非空
+    const unc = typeof out.layout.uncategorizedName === 'string' ? out.layout.uncategorizedName.trim() : '';
+    out.layout.uncategorizedName = unc ? unc.slice(0, 20) : '未分类';
     return out;
   }
 
