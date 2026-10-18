@@ -4,6 +4,12 @@
 (function (global) {
   'use strict';
 
+  /* ---------- 应用版本 ---------- */
+  // 单一来源：界面上显示的版本号、文档与发布记录都以这里为准。
+  // SCHEMA_VERSION（数据结构版本）是另一套编号，改数据结构才动它。
+  const APP_VERSION = '1.2';
+  const APP_VERSION_DATE = '2026-10-18';
+
   /* ---------- DOM 简写 ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -283,6 +289,8 @@
   }
 
   global.U = {
+    APP_VERSION,
+    APP_VERSION_DATE,
     $,
     $$,
     el,

@@ -551,21 +551,27 @@
     board.dataset.size = s.layout.cardSize || 'medium';
     board.dataset.showdesc = s.layout.showDescription ? 'true' : 'false';
 
-    // 每行卡片数：auto 时按窗口宽度自适应
+    // 宽屏折叠侧边栏后，省下的横向空间要归还给内容区，
+    // 否则列数不变、卡片只会被白白拉宽，折叠就失去意义
+    let viewW = global.innerWidth || 1440;
+    if (viewW > 1023 && global.Store.sidebarCollapsed && global.Store.sidebarCollapsed()) {
+      const sw = parseFloat(global.getComputedStyle(root).getPropertyValue('--sidebar-w')) || 228;
+      viewW += sw;
+    }
+
+    // 每行卡片数：auto 时按可用宽度自适应
     let cols;
     if (s.layout.columns === 'auto') {
-      const w = global.innerWidth || 1440;
-      if (w >= 1560) cols = 6;
-      else if (w >= 1280) cols = 5;
-      else if (w >= 1000) cols = 4;
-      else if (w >= 768) cols = 3;
+      if (viewW >= 1560) cols = 6;
+      else if (viewW >= 1280) cols = 5;
+      else if (viewW >= 1000) cols = 4;
+      else if (viewW >= 768) cols = 3;
       else cols = 2;
     } else {
       cols = Number(s.layout.columns) || 5;
       // 小屏强制收敛
-      const w = global.innerWidth || 1440;
-      if (w < 768) cols = Math.min(cols, 2);
-      else if (w < 1024) cols = Math.min(cols, 3);
+      if (viewW < 768) cols = Math.min(cols, 2);
+      else if (viewW < 1024) cols = Math.min(cols, 3);
     }
     root.style.setProperty('--cols-xl', String(cols));
     root.style.setProperty('--cols', String(cols));

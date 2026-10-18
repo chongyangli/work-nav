@@ -135,6 +135,8 @@
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   border-right: 1px solid var(--divider);
   overflow: hidden;
+  transition: width 0.26s var(--ease), padding 0.26s var(--ease),
+    border-color 0.26s var(--ease), opacity 0.2s var(--ease);
 }
 
 .cat-list {
@@ -145,6 +147,17 @@
 }
 
 .sidebar-foot { flex: none; padding-top: 10px; }
+
+/* 版本号：低调但可查，方便确认线上跑的是哪一版 */
+.app-ver {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-3);
+  opacity: 0.7;
+  user-select: text;
+}
 
 /* 分类项 */
 .cat-item {
@@ -490,6 +503,18 @@
 
 @media (max-width: 1399px) {
   .board { --cols-max: 4; }
+}
+
+/* 宽屏折叠：侧栏收成 0 宽，内容区占满；按钮留在顶栏，随时可展开 */
+@media (min-width: 1024px) {
+  .sidebar.is-collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 @media (max-width: 1023px) {

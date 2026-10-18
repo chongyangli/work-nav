@@ -162,10 +162,11 @@ button { cursor: pointer; border: none; background: none; }
 /* ---------- 通用工具类 ---------- */
 [hidden] { display: none !important; }
 
-.only-mobile { display: none; }
+/* 工具类必须压过组件自身的 display，否则会被后加载的 .icon-btn 覆盖 */
+.only-mobile { display: none !important; }
 
 @media (max-width: 1023px) {
-  .only-mobile { display: inline-flex; align-items: center; justify-content: center; }
+  .only-mobile { display: inline-flex !important; align-items: center; justify-content: center; }
 }
 
 /* 选区颜色 */
@@ -317,6 +318,8 @@ button { cursor: pointer; border: none; background: none; }
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   border-right: 1px solid var(--divider);
   overflow: hidden;
+  transition: width 0.26s var(--ease), padding 0.26s var(--ease),
+    border-color 0.26s var(--ease), opacity 0.2s var(--ease);
 }
 
 .cat-list {
@@ -327,6 +330,17 @@ button { cursor: pointer; border: none; background: none; }
 }
 
 .sidebar-foot { flex: none; padding-top: 10px; }
+
+/* 版本号：低调但可查，方便确认线上跑的是哪一版 */
+.app-ver {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-3);
+  opacity: 0.7;
+  user-select: text;
+}
 
 /* 分类项 */
 .cat-item {
@@ -674,6 +688,18 @@ button { cursor: pointer; border: none; background: none; }
   .board { --cols-max: 4; }
 }
 
+/* 宽屏折叠：侧栏收成 0 宽，内容区占满；按钮留在顶栏，随时可展开 */
+@media (min-width: 1024px) {
+  .sidebar.is-collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 @media (max-width: 1023px) {
   .sidebar {
     position: fixed;
@@ -767,6 +793,7 @@ button { cursor: pointer; border: none; background: none; }
   flex: none;
 }
 .icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.icon-btn.is-active { background: var(--accent-soft); color: var(--accent); }
 
 /* ---------- 表单 ---------- */
 .form { display: flex; flex-direction: column; gap: 14px; }
@@ -1761,7 +1788,7 @@ body.is-readonly .section-add { display: none !important; }
 <!-- ===== 顶栏 ===== -->
 <header class="topbar">
   <div class="topbar-left">
-    <button aria-label="展开分类" class="icon-btn only-mobile" id="btnSidebarToggle" title="展开分类">
+    <button aria-expanded="true" aria-label="折叠侧边栏" class="icon-btn" id="btnSidebarToggle" title="折叠侧边栏">
       <svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
     <div class="brand">
@@ -1812,6 +1839,7 @@ body.is-readonly .section-add { display: none !important; }
         <svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         <span>新建分类</span>
       </button>
+      <div class="app-ver" id="appVer"></div>
     </div>
   </aside>
 
@@ -2326,6 +2354,12 @@ body.is-readonly .section-add { display: none !important; }
 (function (global) {
   'use strict';
 
+  /* ---------- 应用版本 ---------- */
+  // 单一来源：界面上显示的版本号、文档与发布记录都以这里为准。
+  // SCHEMA_VERSION（数据结构版本）是另一套编号，改数据结构才动它。
+  const APP_VERSION = '1.2';
+  const APP_VERSION_DATE = '2026-10-18';
+
   /* ---------- DOM 简写 ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -2605,6 +2639,8 @@ body.is-readonly .section-add { display: none !important; }
   }
 
   global.U = {
+    APP_VERSION,
+    APP_VERSION_DATE,
     $,
     $$,
     el,
@@ -2736,6 +2772,7 @@ body.is-readonly .section-add { display: none !important; }
       sortMode: 'manual',
       showTags: true,
       uncategorizedName: '未分类',
+      sidebarCollapsed: false,
     },
     behavior: {
       defaultOpenIn: 'new',
@@ -4024,6 +4061,22 @@ body.is-readonly .section-add { display: none !important; }
     return { ok: true, name: v };
   }
 
+  /**
+   * 桌面端折叠侧边栏（窄屏走抽屉，不受此设置影响）
+   * 注意：updateSettings 对 layout 是整体替换后再补默认值，
+   * 所以 layout 必须传完整对象，否则 columns / cardSize 等会被重置
+   */
+  function sidebarCollapsed() {
+    const layout = (state.data.settings && state.data.settings.layout) || {};
+    return !!layout.sidebarCollapsed;
+  }
+
+  function setSidebarCollapsed(v) {
+    const layout = Object.assign({}, state.data.settings.layout, { sidebarCollapsed: !!v });
+    updateSettings({ layout: layout }, 'settings:sidebar');
+    return { ok: true, collapsed: !!v };
+  }
+
   function updateBackground(patch) {
     commit((d) => {
       d.settings.background = Object.assign({}, d.settings.background, patch);
@@ -4152,6 +4205,8 @@ body.is-readonly .section-add { display: none !important; }
     uncategorizedSites,
     uncategorizedName,
     setUncategorizedName,
+    sidebarCollapsed,
+    setSidebarCollapsed,
     pinnedSites,
     siteSorter,
     categoryTree,
@@ -5748,21 +5803,27 @@ body.is-readonly .section-add { display: none !important; }
     board.dataset.size = s.layout.cardSize || 'medium';
     board.dataset.showdesc = s.layout.showDescription ? 'true' : 'false';
 
-    // 每行卡片数：auto 时按窗口宽度自适应
+    // 宽屏折叠侧边栏后，省下的横向空间要归还给内容区，
+    // 否则列数不变、卡片只会被白白拉宽，折叠就失去意义
+    let viewW = global.innerWidth || 1440;
+    if (viewW > 1023 && global.Store.sidebarCollapsed && global.Store.sidebarCollapsed()) {
+      const sw = parseFloat(global.getComputedStyle(root).getPropertyValue('--sidebar-w')) || 228;
+      viewW += sw;
+    }
+
+    // 每行卡片数：auto 时按可用宽度自适应
     let cols;
     if (s.layout.columns === 'auto') {
-      const w = global.innerWidth || 1440;
-      if (w >= 1560) cols = 6;
-      else if (w >= 1280) cols = 5;
-      else if (w >= 1000) cols = 4;
-      else if (w >= 768) cols = 3;
+      if (viewW >= 1560) cols = 6;
+      else if (viewW >= 1280) cols = 5;
+      else if (viewW >= 1000) cols = 4;
+      else if (viewW >= 768) cols = 3;
       else cols = 2;
     } else {
       cols = Number(s.layout.columns) || 5;
       // 小屏强制收敛
-      const w = global.innerWidth || 1440;
-      if (w < 768) cols = Math.min(cols, 2);
-      else if (w < 1024) cols = Math.min(cols, 3);
+      if (viewW < 768) cols = Math.min(cols, 2);
+      else if (viewW < 1024) cols = Math.min(cols, 3);
     }
     root.style.setProperty('--cols-xl', String(cols));
     root.style.setProperty('--cols', String(cols));
@@ -7771,6 +7832,44 @@ body.is-readonly .section-add { display: none !important; }
   }
 
   /* ============================================================
+     侧边栏：宽屏折叠 / 窄屏抽屉
+     ============================================================ */
+
+  const MOBILE_BP = 1023;
+
+  /** 把折叠状态落到 DOM；窄屏不使用折叠，始终走抽屉 */
+  function applySidebarCollapsed() {
+    const sb = $('#sidebar');
+    if (!sb) return;
+    const collapsed = global.innerWidth > MOBILE_BP && global.Store.sidebarCollapsed();
+    sb.classList.toggle('is-collapsed', collapsed);
+    syncSidebarToggle();
+    // 等宽度过渡走完再重排列数，避免卡片在收展动画中途跳变
+    global.setTimeout(() => {
+      if (global.Render && global.Render.applyLayout) global.Render.applyLayout();
+    }, 280);
+  }
+
+  /** 按钮提示语随场景变化：窄屏是抽屉开关，宽屏是折叠开关 */
+  function syncSidebarToggle() {
+    const btn = $('#btnSidebarToggle');
+    if (!btn) return;
+    let label;
+    let expanded;
+    if (global.innerWidth <= MOBILE_BP) {
+      expanded = !!global.Store.state.ui.sidebarOpen;
+      label = expanded ? '收起分类' : '展开分类';
+    } else {
+      expanded = !global.Store.sidebarCollapsed();
+      label = expanded ? '折叠侧边栏' : '展开侧边栏';
+    }
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.classList.toggle('is-active', !expanded);
+  }
+
+  /* ============================================================
      事件绑定
      ============================================================ */
 
@@ -7856,10 +7955,18 @@ body.is-readonly .section-add { display: none !important; }
     });
 
     bind('#btnSidebarToggle', 'click', () => {
-      const open = global.Store.state.ui.sidebarOpen;
-      global.Store.toggleSidebar(!open);
-      $('#sidebar').classList.toggle('is-open', !open);
-      $('#sidebarMask').hidden = open;
+      // 窄屏：侧边栏是抽屉，点一下开关
+      if (global.innerWidth <= MOBILE_BP) {
+        const open = global.Store.state.ui.sidebarOpen;
+        global.Store.toggleSidebar(!open);
+        $('#sidebar').classList.toggle('is-open', !open);
+        $('#sidebarMask').hidden = open;
+        syncSidebarToggle();
+        return;
+      }
+      // 宽屏：折叠 / 展开，把横向空间让给内容区
+      global.Store.setSidebarCollapsed(!global.Store.sidebarCollapsed());
+      applySidebarCollapsed();
     });
 
     bind('#sidebarMask', 'click', () => {
@@ -8232,6 +8339,16 @@ body.is-readonly .section-add { display: none !important; }
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         global.Render.applyLayout();
+        // 宽屏下侧边栏是常驻布局，必须清掉移动端遗留的展开态与遮罩
+        // 否则从窄屏拖宽后，遮罩会一直盖在内容上且无从关闭
+        if (global.innerWidth > MOBILE_BP && global.Store.state.ui.sidebarOpen) {
+          global.Store.toggleSidebar(false);
+          const sb = $('#sidebar');
+          if (sb) sb.classList.remove('is-open');
+          const mask = $('#sidebarMask');
+          if (mask) mask.hidden = true;
+        }
+        applySidebarCollapsed();
       }, 150);
     });
 
@@ -8282,6 +8399,15 @@ body.is-readonly .section-add { display: none !important; }
      启动
      ============================================================ */
 
+  /** 侧边栏底部的版本号；单一来源是 U.APP_VERSION，避免多处维护 */
+  function paintVersion() {
+    const el = $('#appVer');
+    if (!el) return;
+    const v = global.U.APP_VERSION;
+    el.textContent = 'v' + v;
+    el.title = '工作导航 v' + v + '（' + global.U.APP_VERSION_DATE + '）';
+  }
+
   async function boot() {
     // 1. 数据
     const res = global.Store.init();
@@ -8294,6 +8420,7 @@ body.is-readonly .section-add { display: none !important; }
 
     // 4. 渲染
     global.Render.renderAll();
+    paintVersion();
 
     // 5. 事件
     bindEvents();
@@ -8301,6 +8428,7 @@ body.is-readonly .section-add { display: none !important; }
     startClock();
     initDragAndDrop();
     applyReadonlyMode();
+    applySidebarCollapsed();
     updateSelectBar();
     Background.startRotation(global.Store.getSettings().background);
 

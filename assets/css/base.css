@@ -148,10 +148,11 @@ button { cursor: pointer; border: none; background: none; }
 /* ---------- 通用工具类 ---------- */
 [hidden] { display: none !important; }
 
-.only-mobile { display: none; }
+/* 工具类必须压过组件自身的 display，否则会被后加载的 .icon-btn 覆盖 */
+.only-mobile { display: none !important; }
 
 @media (max-width: 1023px) {
-  .only-mobile { display: inline-flex; align-items: center; justify-content: center; }
+  .only-mobile { display: inline-flex !important; align-items: center; justify-content: center; }
 }
 
 /* 选区颜色 */

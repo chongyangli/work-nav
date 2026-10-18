@@ -98,6 +98,7 @@
       sortMode: 'manual',
       showTags: true,
       uncategorizedName: '未分类',
+      sidebarCollapsed: false,
     },
     behavior: {
       defaultOpenIn: 'new',

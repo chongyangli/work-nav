@@ -814,6 +814,22 @@
     return { ok: true, name: v };
   }
 
+  /**
+   * 桌面端折叠侧边栏（窄屏走抽屉，不受此设置影响）
+   * 注意：updateSettings 对 layout 是整体替换后再补默认值，
+   * 所以 layout 必须传完整对象，否则 columns / cardSize 等会被重置
+   */
+  function sidebarCollapsed() {
+    const layout = (state.data.settings && state.data.settings.layout) || {};
+    return !!layout.sidebarCollapsed;
+  }
+
+  function setSidebarCollapsed(v) {
+    const layout = Object.assign({}, state.data.settings.layout, { sidebarCollapsed: !!v });
+    updateSettings({ layout: layout }, 'settings:sidebar');
+    return { ok: true, collapsed: !!v };
+  }
+
   function updateBackground(patch) {
     commit((d) => {
       d.settings.background = Object.assign({}, d.settings.background, patch);
@@ -942,6 +958,8 @@
     uncategorizedSites,
     uncategorizedName,
     setUncategorizedName,
+    sidebarCollapsed,
+    setSidebarCollapsed,
     pinnedSites,
     siteSorter,
     categoryTree,

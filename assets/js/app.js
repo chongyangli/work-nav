@@ -1634,6 +1634,44 @@
   }
 
   /* ============================================================
+     侧边栏：宽屏折叠 / 窄屏抽屉
+     ============================================================ */
+
+  const MOBILE_BP = 1023;
+
+  /** 把折叠状态落到 DOM；窄屏不使用折叠，始终走抽屉 */
+  function applySidebarCollapsed() {
+    const sb = $('#sidebar');
+    if (!sb) return;
+    const collapsed = global.innerWidth > MOBILE_BP && global.Store.sidebarCollapsed();
+    sb.classList.toggle('is-collapsed', collapsed);
+    syncSidebarToggle();
+    // 等宽度过渡走完再重排列数，避免卡片在收展动画中途跳变
+    global.setTimeout(() => {
+      if (global.Render && global.Render.applyLayout) global.Render.applyLayout();
+    }, 280);
+  }
+
+  /** 按钮提示语随场景变化：窄屏是抽屉开关，宽屏是折叠开关 */
+  function syncSidebarToggle() {
+    const btn = $('#btnSidebarToggle');
+    if (!btn) return;
+    let label;
+    let expanded;
+    if (global.innerWidth <= MOBILE_BP) {
+      expanded = !!global.Store.state.ui.sidebarOpen;
+      label = expanded ? '收起分类' : '展开分类';
+    } else {
+      expanded = !global.Store.sidebarCollapsed();
+      label = expanded ? '折叠侧边栏' : '展开侧边栏';
+    }
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    btn.classList.toggle('is-active', !expanded);
+  }
+
+  /* ============================================================
      事件绑定
      ============================================================ */
 
@@ -1719,10 +1757,18 @@
     });
 
     bind('#btnSidebarToggle', 'click', () => {
-      const open = global.Store.state.ui.sidebarOpen;
-      global.Store.toggleSidebar(!open);
-      $('#sidebar').classList.toggle('is-open', !open);
-      $('#sidebarMask').hidden = open;
+      // 窄屏：侧边栏是抽屉，点一下开关
+      if (global.innerWidth <= MOBILE_BP) {
+        const open = global.Store.state.ui.sidebarOpen;
+        global.Store.toggleSidebar(!open);
+        $('#sidebar').classList.toggle('is-open', !open);
+        $('#sidebarMask').hidden = open;
+        syncSidebarToggle();
+        return;
+      }
+      // 宽屏：折叠 / 展开，把横向空间让给内容区
+      global.Store.setSidebarCollapsed(!global.Store.sidebarCollapsed());
+      applySidebarCollapsed();
     });
 
     bind('#sidebarMask', 'click', () => {
@@ -2095,6 +2141,16 @@
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         global.Render.applyLayout();
+        // 宽屏下侧边栏是常驻布局，必须清掉移动端遗留的展开态与遮罩
+        // 否则从窄屏拖宽后，遮罩会一直盖在内容上且无从关闭
+        if (global.innerWidth > MOBILE_BP && global.Store.state.ui.sidebarOpen) {
+          global.Store.toggleSidebar(false);
+          const sb = $('#sidebar');
+          if (sb) sb.classList.remove('is-open');
+          const mask = $('#sidebarMask');
+          if (mask) mask.hidden = true;
+        }
+        applySidebarCollapsed();
       }, 150);
     });
 
@@ -2145,6 +2201,15 @@
      启动
      ============================================================ */
 
+  /** 侧边栏底部的版本号；单一来源是 U.APP_VERSION，避免多处维护 */
+  function paintVersion() {
+    const el = $('#appVer');
+    if (!el) return;
+    const v = global.U.APP_VERSION;
+    el.textContent = 'v' + v;
+    el.title = '工作导航 v' + v + '（' + global.U.APP_VERSION_DATE + '）';
+  }
+
   async function boot() {
     // 1. 数据
     const res = global.Store.init();
@@ -2157,6 +2222,7 @@
 
     // 4. 渲染
     global.Render.renderAll();
+    paintVersion();
 
     // 5. 事件
     bindEvents();
@@ -2164,6 +2230,7 @@
     startClock();
     initDragAndDrop();
     applyReadonlyMode();
+    applySidebarCollapsed();
     updateSelectBar();
     Background.startRotation(global.Store.getSettings().background);
 
