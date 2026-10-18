@@ -238,9 +238,12 @@
               <input checked id="checkAllCats" type="checkbox">
               <span>全选 / 全不选</span>
             </label>
-            <span class="tree-hint">取消勾选的分类不会被导入</span>
+            <div class="tree-tools">
+              <button class="link-btn" id="btnTreeToggle" type="button">收起全部</button>
+              <span class="tree-hint">按书签目录层级展示，可逐个站点勾选</span>
+            </div>
           </div>
-          <ul class="tree" id="importTree"></ul>
+          <div class="tree" id="importTree"></div>
         </div>
       </section>
 

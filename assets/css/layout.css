@@ -197,8 +197,18 @@
 .cat-item .cat-more.is-always { opacity: 0.4; }
 .cat-item:hover .cat-more.is-always { opacity: 0.85; }
 
-/* 二级分类缩进 */
-.cat-item.is-sub { padding-left: 26px; font-size: 13px; }
+/* 多级分类缩进：--depth 由 JS 按实际层级写入（1 = 二级，最多 3） */
+.cat-item.is-sub { padding-left: calc(26px + var(--depth, 0) * 14px); font-size: 13px; }
+/* 层级参考线：让三层以上也能一眼看出归属 */
+.cat-item.is-sub::before {
+  content: '';
+  position: absolute;
+  left: calc(16px + (var(--depth, 0) - 1) * 14px);
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--divider);
+}
 
 .cat-sep {
   height: 1px;
@@ -242,6 +252,18 @@
   margin-bottom: 12px;
 }
 
+/* 多级分类：子层级的区块整体缩进，层级越深缩进越大（最多 3 级视觉缩进） */
+.section.is-nested { margin-left: calc(var(--depth, 1) * 18px); }
+.section.is-nested .section-title { font-size: 14px; }
+.section.is-nested .section-head::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--divider);
+  flex: none;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -252,6 +274,14 @@
 }
 
 .section-title .cat-ico { font-size: 16px; }
+
+/* 深层分组：标题前显示父级路径，避免只看名字分不清归属 */
+.section-path {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--text-2);
+  opacity: 0.72;
+}
 
 .section-count {
   font-size: 12px;

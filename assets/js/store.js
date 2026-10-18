@@ -160,11 +160,54 @@
       .sort((a, b) => a.order - b.order);
   }
 
-  /** 分类下的站点（含子分类） */
+  /** 某分类下的全部子孙分类 id（不含自身，带环保护） */
+  function descendantIds(catId) {
+    const out = [];
+    const seen = new Set([catId]);
+    let queue = [catId];
+    while (queue.length) {
+      const cur = queue.shift();
+      state.data.categories.forEach((c) => {
+        if (c.parentId === cur && !seen.has(c.id)) {
+          seen.add(c.id);
+          out.push(c.id);
+          queue.push(c.id);
+        }
+      });
+    }
+    return out;
+  }
+
+  /** 从根到该分类的名称路径，例如 ['开发', '前端', '框架'] */
+  function categoryPath(catId) {
+    const names = [];
+    const seen = new Set();
+    let cur = getCategory(catId);
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      names.unshift(cur.name);
+      cur = cur.parentId ? getCategory(cur.parentId) : null;
+    }
+    return names;
+  }
+
+  /** 分类深度（一级 = 1） */
+  function categoryDepth(catId) {
+    return categoryPath(catId).length || 0;
+  }
+
+  /** 该分类子树相对自身还有多少层（叶子 = 0） */
+  function maxSubDepth(catId) {
+    const kids = childCategories(catId);
+    if (!kids.length) return 0;
+    return 1 + kids.reduce((m, k) => Math.max(m, maxSubDepth(k.id)), 0);
+  }
+
+  /** 分类下的站点（includeChildren 时含所有层级子孙） */
   function sitesOfCategory(catId, includeChildren) {
     const ids = new Set([catId]);
     if (includeChildren !== false) {
-      childCategories(catId).forEach((c) => ids.add(c.id));
+      descendantIds(catId).forEach((id) => ids.add(id));
     }
     return state.data.sites
       .filter((s) => ids.has(s.categoryId))
@@ -201,12 +244,28 @@
     return a.name.localeCompare(b.name, 'zh-CN');
   }
 
+  /** 分类树（支持任意层级） */
   function categoryTree() {
-    const tops = topCategories();
-    return tops.map((t) => ({
-      cat: t,
-      children: childCategories(t.id),
-    }));
+    function build(cat) {
+      return {
+        cat: cat,
+        children: childCategories(cat.id).map(build),
+      };
+    }
+    return topCategories().map(build);
+  }
+
+  /** 扁平化的分类树，按显示顺序排列（父在前、子在后），带 depth */
+  function flatCategoryTree() {
+    const out = [];
+    function walk(nodes, depth) {
+      nodes.forEach((n) => {
+        out.push({ cat: n.cat, depth: depth });
+        if (n.children.length) walk(n.children, depth + 1);
+      });
+    }
+    walk(categoryTree(), 1);
+    return out;
   }
 
   /* ============================================================
@@ -257,9 +316,18 @@
       if (patch.order !== undefined) c.order = patch.order;
       if (patch.parentId !== undefined) {
         const pid = patch.parentId || null;
-        if (pid !== id) {
-          const p = pid ? d.categories.find((x) => x.id === pid) : null;
-          if (!p || !p.parentId) c.parentId = pid; // 只允许挂在一级分类下
+        if (pid && pid !== id) {
+          // 不能挂到自己或自己的子孙下面，否则成环
+          const banned = new Set(descendantIds(id));
+          banned.add(id);
+          if (!banned.has(pid)) {
+            // 也不能超过层级上限
+            const pDepth = categoryDepth(pid);
+            const subDepth = maxSubDepth(id);
+            if (pDepth > 0 && pDepth + 1 + subDepth <= global.Storage.MAX_CATEGORY_DEPTH) c.parentId = pid;
+          }
+        } else if (!pid) {
+          c.parentId = null;
         }
       }
     }, 'category:update');
@@ -274,9 +342,8 @@
   function deleteCategory(id, strategy) {
     const cat = getCategory(id);
     if (!cat) return { ok: false, message: '分类不存在' };
-    const children = childCategories(id);
-    const childIds = children.map((c) => c.id);
-    const allIds = new Set([id].concat(childIds));
+    const descendants = descendantIds(id);
+    const allIds = new Set([id].concat(descendants));
     const affected = state.data.sites.filter((s) => allIds.has(s.categoryId)).length;
 
     commit((d) => {
@@ -290,7 +357,7 @@
       d.categories = d.categories.filter((c) => !allIds.has(c.id));
     }, 'category:delete');
 
-    return { ok: true, affected: affected, children: children.length };
+    return { ok: true, affected: affected, children: descendants.length };
   }
 
   function reorderCategory(id, newOrder) {
@@ -582,7 +649,7 @@
 
   /**
    * 批量写入（导入收藏夹 / JSON 恢复共用）
-   * @param {object} payload { categories: [{name, parentName}], sites: [{name,url,categoryName,description,icon,tags}] }
+   * @param {object} payload { categories: [{name, parentName, path}], sites: [{name,url,path,categoryName,parentName,...}] }
    * @param {object} opts { mode: 'merge'|'newonly'|'replace' }
    */
   function bulkImport(payload, opts) {
@@ -597,13 +664,30 @@
       total: 0,
     };
 
+    const MAX_DEPTH = (global.Storage && global.Storage.MAX_CATEGORY_DEPTH) || 6;
+
+    /** 取出一条记录的分类路径名称数组（兼容 path / parentName+categoryName 两种写法） */
+    function pathNamesOf(obj) {
+      if (!obj) return [];
+      if (Array.isArray(obj.path) && obj.path.length) {
+        return obj.path
+          .map((x) => String(x == null ? '' : x).trim().slice(0, 40))
+          .filter(Boolean)
+          .slice(0, MAX_DEPTH);
+      }
+      const arr = [];
+      if (obj.parentName) arr.push(String(obj.parentName).trim().slice(0, 40));
+      if (obj.categoryName) arr.push(String(obj.categoryName).trim().slice(0, 40));
+      return arr.filter(Boolean).slice(0, MAX_DEPTH);
+    }
+
     commit((d) => {
       if (mode === 'replace') {
         d.categories = [];
         d.sites = [];
       }
 
-      // 已有分类名 → id 映射（同名视为同一分类）
+      // 已有分类 (parentId|name) → id 映射（同名视为同一分类）
       const catByName = new Map();
       d.categories.forEach((c) => {
         const key = (c.parentId || '') + '|' + c.name;
@@ -615,54 +699,44 @@
 
       let catOrder = d.categories.reduce((m, c) => Math.max(m, c.order), 0);
 
-      // 1. 先建分类
-      (payload.categories || []).forEach((pc) => {
-        const name = String(pc.name || '').trim().slice(0, 40);
-        if (!name) return;
-        const parentName = pc.parentName ? String(pc.parentName).trim().slice(0, 40) : '';
-
+      /**
+       * 逐层确保分类存在，返回最深一级的分类 id
+       * @param {Array<string>} names 形如 ['开发', '前端', '框架']
+       */
+      function ensureCategory(names, icon) {
         let parentId = null;
-        if (parentName) {
-          const pKey = '|' + parentName;
-          if (catByName.has(pKey)) {
-            parentId = catByName.get(pKey);
-            result.reusedCategories++;
-          } else {
-            catOrder += 100;
-            const pCat = {
-              id: U.uid('cat'),
-              name: parentName,
-              parentId: null,
-              icon: '',
-              order: catOrder,
-              collapsed: false,
-              createdAt: Date.now(),
-            };
-            d.categories.push(pCat);
-            catByName.set(pKey, pCat.id);
-            parentId = pCat.id;
-            result.addedCategories++;
+        for (let i = 0; i < names.length; i++) {
+          const name = names[i];
+          const key = (parentId || '') + '|' + name;
+          const hit = catByName.get(key);
+          if (hit) {
+            parentId = hit;
+            if (i === names.length - 1) result.reusedCategories++;
+            continue;
           }
+          catOrder += 100;
+          const cat = {
+            id: U.uid('cat'),
+            name: name,
+            parentId: parentId,
+            icon: i === names.length - 1 ? icon || '' : '',
+            order: catOrder,
+            collapsed: false,
+            createdAt: Date.now(),
+          };
+          d.categories.push(cat);
+          catByName.set(key, cat.id);
+          parentId = cat.id;
+          result.addedCategories++;
         }
+        return parentId;
+      }
 
-        const key = (parentId || '') + '|' + name;
-        if (catByName.has(key)) {
-          result.reusedCategories++;
-          return;
-        }
-        catOrder += 100;
-        const cat = {
-          id: U.uid('cat'),
-          name: name,
-          parentId: parentId,
-          icon: pc.icon || '',
-          order: catOrder,
-          collapsed: false,
-          createdAt: Date.now(),
-        };
-        d.categories.push(cat);
-        catByName.set(key, cat.id);
-        result.addedCategories++;
+      // 1. 先建分类（空文件夹也能建出来）
+      (payload.categories || []).forEach((pc) => {
+        const names = pathNamesOf(pc);
+        if (!names.length) return;
+        ensureCategory(names, pc.icon);
       });
 
       // 2. 再建站点
@@ -681,60 +755,16 @@
           return;
         }
 
-        // 定位分类
-        let catId = '';
-        const catName = String(ps.categoryName || '').trim().slice(0, 40);
-        const parentName = String(ps.parentName || '').trim().slice(0, 40);
-        if (catName) {
-          let parentId = null;
-          if (parentName) {
-            const pKey = '|' + parentName;
-            if (catByName.has(pKey)) parentId = catByName.get(pKey);
-            else {
-              catOrder += 100;
-              const pCat = {
-                id: U.uid('cat'),
-                name: parentName,
-                parentId: null,
-                icon: '',
-                order: catOrder,
-                collapsed: false,
-                createdAt: Date.now(),
-              };
-              d.categories.push(pCat);
-              catByName.set(pKey, pCat.id);
-              parentId = pCat.id;
-              result.addedCategories++;
-            }
-          }
-          const key = (parentId || '') + '|' + catName;
-          if (catByName.has(key)) {
-            catId = catByName.get(key);
-          } else if (mode !== 'newonly' || true) {
-            // 分类不存在则创建
-            catOrder += 100;
-            const cat = {
-              id: U.uid('cat'),
-              name: catName,
-              parentId: parentId,
-              icon: '',
-              order: catOrder,
-              collapsed: false,
-              createdAt: Date.now(),
-            };
-            d.categories.push(cat);
-            catByName.set(key, cat.id);
-            catId = cat.id;
-            result.addedCategories++;
-          }
-        }
+        // 定位分类：按完整路径逐层创建 / 复用
+        const names = pathNamesOf(ps);
+        const catId = names.length ? ensureCategory(names, '') : '';
 
         siteOrder += 100;
         d.sites.push({
           id: U.uid('s'),
           name: String(ps.name || '').trim().slice(0, 60) || U.getHost(n.url),
           url: n.url,
-          categoryId: catId,
+          categoryId: catId || '',
           description: String(ps.description || '').slice(0, 120),
           icon: String(ps.icon || ''),
           tags: Array.isArray(ps.tags) ? ps.tags.slice(0, 12) : [],
@@ -904,6 +934,10 @@
     getSite,
     topCategories,
     childCategories,
+    descendantIds,
+    categoryPath,
+    categoryDepth,
+    flatCategoryTree,
     sitesOfCategory,
     uncategorizedSites,
     uncategorizedName,

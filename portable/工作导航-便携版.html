@@ -379,8 +379,18 @@ button { cursor: pointer; border: none; background: none; }
 .cat-item .cat-more.is-always { opacity: 0.4; }
 .cat-item:hover .cat-more.is-always { opacity: 0.85; }
 
-/* 二级分类缩进 */
-.cat-item.is-sub { padding-left: 26px; font-size: 13px; }
+/* 多级分类缩进：--depth 由 JS 按实际层级写入（1 = 二级，最多 3） */
+.cat-item.is-sub { padding-left: calc(26px + var(--depth, 0) * 14px); font-size: 13px; }
+/* 层级参考线：让三层以上也能一眼看出归属 */
+.cat-item.is-sub::before {
+  content: '';
+  position: absolute;
+  left: calc(16px + (var(--depth, 0) - 1) * 14px);
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--divider);
+}
 
 .cat-sep {
   height: 1px;
@@ -424,6 +434,18 @@ button { cursor: pointer; border: none; background: none; }
   margin-bottom: 12px;
 }
 
+/* 多级分类：子层级的区块整体缩进，层级越深缩进越大（最多 3 级视觉缩进） */
+.section.is-nested { margin-left: calc(var(--depth, 1) * 18px); }
+.section.is-nested .section-title { font-size: 14px; }
+.section.is-nested .section-head::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--divider);
+  flex: none;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -434,6 +456,14 @@ button { cursor: pointer; border: none; background: none; }
 }
 
 .section-title .cat-ico { font-size: 16px; }
+
+/* 深层分组：标题前显示父级路径，避免只看名字分不清归属 */
+.section-path {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--text-2);
+  opacity: 0.72;
+}
 
 .section-count {
   font-size: 12px;
@@ -1104,9 +1134,11 @@ input[type="range"]::-moz-range-thumb {
 .stat-chip.is-warn { background: var(--warn-soft); }
 .stat-chip.is-warn .stat-num { color: var(--warn); }
 
-/* 分类树（导入预览） */
+/* 分类树（导入预览）
+   结构：.tnode > .trow + .tchildren > .tnode ...
+   缩进由 --depth 控制，站点行与文件夹行共用 .trow 布局 */
 .tree-wrap {
-  max-height: 320px;
+  max-height: 340px;
   overflow-y: auto;
   border: 1px solid var(--divider);
   border-radius: var(--r-card);
@@ -1116,43 +1148,88 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 0 4px 10px;
   border-bottom: 1px solid var(--divider);
   margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-elevated);
+  z-index: 2;
 }
-.tree-hint { font-size: 11.5px; color: var(--text-3); }
+.tree-tools { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tree-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; }
-.check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex: none; }
 
-.tree { display: flex; flex-direction: column; gap: 2px; }
-.tree-item { border-radius: var(--r-sm); }
-.tree-item > .check {
-  padding: 7px 8px;
+.tree { display: flex; flex-direction: column; gap: 1px; }
+.tchildren[hidden] { display: none; }
+
+.trow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px calc(8px + (var(--depth, 1) - 1) * 16px);
   border-radius: var(--r-sm);
-  font-weight: 550;
   transition: var(--trans);
+  min-width: 0;
 }
-.tree-item > .check:hover { background: var(--accent-soft); }
-.tree-item .tree-sub { padding-left: 26px; }
+.trow:hover { background: var(--accent-soft); }
 
-.tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-badge {
+/* 折叠箭头 */
+.tcaret {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  padding: 0;
+}
+.tcaret.is-open { transform: rotate(90deg); }
+.tcaret.is-ghost { visibility: hidden; cursor: default; }
+
+.tfolder .check { flex: 1; min-width: 0; font-weight: 600; }
+.tfolder.is-top .check { font-weight: 650; }
+.tsite .check { flex: 1; min-width: 0; font-weight: 400; }
+
+.tname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tsite .tname { color: var(--text-2); }
+.trow input:not(:checked) + .tname { color: var(--text-3); }
+
+.thost {
+  flex: none;
+  max-width: 38%;
+  font-size: 10.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbadge {
   font-size: 11px;
   color: var(--text-3);
   background: var(--bg);
   padding: 1px 7px;
   border-radius: 99px;
   flex: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.tree-samples {
-  padding: 2px 8px 8px 30px;
-  font-size: 11.5px;
-  color: var(--text-3);
-  line-height: 1.7;
-}
-.tree-samples span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 未分类这一层没有真实文件夹，弱化显示 */
+.tfolder.is-virtual .tname { font-style: normal; color: var(--text-2); }
 
 /* 导入模式选择 */
 .mode-group { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
@@ -1895,9 +1972,12 @@ body.is-readonly .section-add { display: none !important; }
               <input checked id="checkAllCats" type="checkbox">
               <span>全选 / 全不选</span>
             </label>
-            <span class="tree-hint">取消勾选的分类不会被导入</span>
+            <div class="tree-tools">
+              <button class="link-btn" id="btnTreeToggle" type="button">收起全部</button>
+              <span class="tree-hint">按书签目录层级展示，可逐个站点勾选</span>
+            </div>
           </div>
-          <ul class="tree" id="importTree"></ul>
+          <div class="tree" id="importTree"></div>
         </div>
       </section>
 
@@ -2837,21 +2917,54 @@ body.is-readonly .section-add { display: none !important; }
       });
     }
 
-    // 清理孤儿 parentId
-    const removeSet = new Set();
+    // 清理孤儿 parentId：父级不存在 → 挂到一级
     out.categories.forEach((c) => {
       if (c.parentId && !catIds.has(c.parentId)) c.parentId = null;
     });
-    // 限制只有两层：父分类的 parentId 必须为空
+
+    // 环检测 + 层级上限：防止手工编辑或异常数据把树弄成环
     out.categories.forEach((c) => {
-      if (c.parentId) {
-        const p = out.categories.find((x) => x.id === c.parentId);
-        if (p && p.parentId) c.parentId = null; // 三级降级为一级
+      if (!c.parentId) return;
+      const chain = ancestorsOf(out.categories, c.parentId);
+      if (chain.indexOf(c.id) >= 0) {
+        c.parentId = null; // 自己出现在祖先链里 → 断开
+        return;
       }
+      if (depthOf(out.categories, c) > MAX_CATEGORY_DEPTH) c.parentId = null;
     });
-    void removeSet;
 
     return { data: out, issues: issues };
+  }
+
+  /** 分类最大层级（书签目录可能很深，但再深就没法用了） */
+  const MAX_CATEGORY_DEPTH = 6;
+
+  /** 收集某个分类的全部祖先 id（含自身），用于环检测 */
+  function ancestorsOf(list, id) {
+    const out = [];
+    const seen = new Set();
+    let cur = list.find((c) => c.id === id) || null;
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      out.push(cur.id);
+      cur = cur.parentId ? list.find((c) => c.id === cur.parentId) || null : null;
+    }
+    return out;
+  }
+
+  function depthOf(list, cat) {
+    let d = 1;
+    let cur = cat;
+    const seen = new Set([cat.id]);
+    while (cur.parentId) {
+      const p = list.find((c) => c.id === cur.parentId);
+      if (!p || seen.has(p.id)) break;
+      seen.add(p.id);
+      d++;
+      cur = p;
+      if (d > 64) break;
+    }
+    return d;
   }
 
   /* ============================================================
@@ -3064,6 +3177,7 @@ body.is-readonly .section-add { display: none !important; }
 
   global.Storage = {
     SCHEMA_VERSION,
+    MAX_CATEGORY_DEPTH,
     DEFAULT_SETTINGS,
     defaultData,
     normalize,
@@ -3256,11 +3370,54 @@ body.is-readonly .section-add { display: none !important; }
       .sort((a, b) => a.order - b.order);
   }
 
-  /** 分类下的站点（含子分类） */
+  /** 某分类下的全部子孙分类 id（不含自身，带环保护） */
+  function descendantIds(catId) {
+    const out = [];
+    const seen = new Set([catId]);
+    let queue = [catId];
+    while (queue.length) {
+      const cur = queue.shift();
+      state.data.categories.forEach((c) => {
+        if (c.parentId === cur && !seen.has(c.id)) {
+          seen.add(c.id);
+          out.push(c.id);
+          queue.push(c.id);
+        }
+      });
+    }
+    return out;
+  }
+
+  /** 从根到该分类的名称路径，例如 ['开发', '前端', '框架'] */
+  function categoryPath(catId) {
+    const names = [];
+    const seen = new Set();
+    let cur = getCategory(catId);
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      names.unshift(cur.name);
+      cur = cur.parentId ? getCategory(cur.parentId) : null;
+    }
+    return names;
+  }
+
+  /** 分类深度（一级 = 1） */
+  function categoryDepth(catId) {
+    return categoryPath(catId).length || 0;
+  }
+
+  /** 该分类子树相对自身还有多少层（叶子 = 0） */
+  function maxSubDepth(catId) {
+    const kids = childCategories(catId);
+    if (!kids.length) return 0;
+    return 1 + kids.reduce((m, k) => Math.max(m, maxSubDepth(k.id)), 0);
+  }
+
+  /** 分类下的站点（includeChildren 时含所有层级子孙） */
   function sitesOfCategory(catId, includeChildren) {
     const ids = new Set([catId]);
     if (includeChildren !== false) {
-      childCategories(catId).forEach((c) => ids.add(c.id));
+      descendantIds(catId).forEach((id) => ids.add(id));
     }
     return state.data.sites
       .filter((s) => ids.has(s.categoryId))
@@ -3297,12 +3454,28 @@ body.is-readonly .section-add { display: none !important; }
     return a.name.localeCompare(b.name, 'zh-CN');
   }
 
+  /** 分类树（支持任意层级） */
   function categoryTree() {
-    const tops = topCategories();
-    return tops.map((t) => ({
-      cat: t,
-      children: childCategories(t.id),
-    }));
+    function build(cat) {
+      return {
+        cat: cat,
+        children: childCategories(cat.id).map(build),
+      };
+    }
+    return topCategories().map(build);
+  }
+
+  /** 扁平化的分类树，按显示顺序排列（父在前、子在后），带 depth */
+  function flatCategoryTree() {
+    const out = [];
+    function walk(nodes, depth) {
+      nodes.forEach((n) => {
+        out.push({ cat: n.cat, depth: depth });
+        if (n.children.length) walk(n.children, depth + 1);
+      });
+    }
+    walk(categoryTree(), 1);
+    return out;
   }
 
   /* ============================================================
@@ -3353,9 +3526,18 @@ body.is-readonly .section-add { display: none !important; }
       if (patch.order !== undefined) c.order = patch.order;
       if (patch.parentId !== undefined) {
         const pid = patch.parentId || null;
-        if (pid !== id) {
-          const p = pid ? d.categories.find((x) => x.id === pid) : null;
-          if (!p || !p.parentId) c.parentId = pid; // 只允许挂在一级分类下
+        if (pid && pid !== id) {
+          // 不能挂到自己或自己的子孙下面，否则成环
+          const banned = new Set(descendantIds(id));
+          banned.add(id);
+          if (!banned.has(pid)) {
+            // 也不能超过层级上限
+            const pDepth = categoryDepth(pid);
+            const subDepth = maxSubDepth(id);
+            if (pDepth > 0 && pDepth + 1 + subDepth <= global.Storage.MAX_CATEGORY_DEPTH) c.parentId = pid;
+          }
+        } else if (!pid) {
+          c.parentId = null;
         }
       }
     }, 'category:update');
@@ -3370,9 +3552,8 @@ body.is-readonly .section-add { display: none !important; }
   function deleteCategory(id, strategy) {
     const cat = getCategory(id);
     if (!cat) return { ok: false, message: '分类不存在' };
-    const children = childCategories(id);
-    const childIds = children.map((c) => c.id);
-    const allIds = new Set([id].concat(childIds));
+    const descendants = descendantIds(id);
+    const allIds = new Set([id].concat(descendants));
     const affected = state.data.sites.filter((s) => allIds.has(s.categoryId)).length;
 
     commit((d) => {
@@ -3386,7 +3567,7 @@ body.is-readonly .section-add { display: none !important; }
       d.categories = d.categories.filter((c) => !allIds.has(c.id));
     }, 'category:delete');
 
-    return { ok: true, affected: affected, children: children.length };
+    return { ok: true, affected: affected, children: descendants.length };
   }
 
   function reorderCategory(id, newOrder) {
@@ -3678,7 +3859,7 @@ body.is-readonly .section-add { display: none !important; }
 
   /**
    * 批量写入（导入收藏夹 / JSON 恢复共用）
-   * @param {object} payload { categories: [{name, parentName}], sites: [{name,url,categoryName,description,icon,tags}] }
+   * @param {object} payload { categories: [{name, parentName, path}], sites: [{name,url,path,categoryName,parentName,...}] }
    * @param {object} opts { mode: 'merge'|'newonly'|'replace' }
    */
   function bulkImport(payload, opts) {
@@ -3693,13 +3874,30 @@ body.is-readonly .section-add { display: none !important; }
       total: 0,
     };
 
+    const MAX_DEPTH = (global.Storage && global.Storage.MAX_CATEGORY_DEPTH) || 6;
+
+    /** 取出一条记录的分类路径名称数组（兼容 path / parentName+categoryName 两种写法） */
+    function pathNamesOf(obj) {
+      if (!obj) return [];
+      if (Array.isArray(obj.path) && obj.path.length) {
+        return obj.path
+          .map((x) => String(x == null ? '' : x).trim().slice(0, 40))
+          .filter(Boolean)
+          .slice(0, MAX_DEPTH);
+      }
+      const arr = [];
+      if (obj.parentName) arr.push(String(obj.parentName).trim().slice(0, 40));
+      if (obj.categoryName) arr.push(String(obj.categoryName).trim().slice(0, 40));
+      return arr.filter(Boolean).slice(0, MAX_DEPTH);
+    }
+
     commit((d) => {
       if (mode === 'replace') {
         d.categories = [];
         d.sites = [];
       }
 
-      // 已有分类名 → id 映射（同名视为同一分类）
+      // 已有分类 (parentId|name) → id 映射（同名视为同一分类）
       const catByName = new Map();
       d.categories.forEach((c) => {
         const key = (c.parentId || '') + '|' + c.name;
@@ -3711,54 +3909,44 @@ body.is-readonly .section-add { display: none !important; }
 
       let catOrder = d.categories.reduce((m, c) => Math.max(m, c.order), 0);
 
-      // 1. 先建分类
-      (payload.categories || []).forEach((pc) => {
-        const name = String(pc.name || '').trim().slice(0, 40);
-        if (!name) return;
-        const parentName = pc.parentName ? String(pc.parentName).trim().slice(0, 40) : '';
-
+      /**
+       * 逐层确保分类存在，返回最深一级的分类 id
+       * @param {Array<string>} names 形如 ['开发', '前端', '框架']
+       */
+      function ensureCategory(names, icon) {
         let parentId = null;
-        if (parentName) {
-          const pKey = '|' + parentName;
-          if (catByName.has(pKey)) {
-            parentId = catByName.get(pKey);
-            result.reusedCategories++;
-          } else {
-            catOrder += 100;
-            const pCat = {
-              id: U.uid('cat'),
-              name: parentName,
-              parentId: null,
-              icon: '',
-              order: catOrder,
-              collapsed: false,
-              createdAt: Date.now(),
-            };
-            d.categories.push(pCat);
-            catByName.set(pKey, pCat.id);
-            parentId = pCat.id;
-            result.addedCategories++;
+        for (let i = 0; i < names.length; i++) {
+          const name = names[i];
+          const key = (parentId || '') + '|' + name;
+          const hit = catByName.get(key);
+          if (hit) {
+            parentId = hit;
+            if (i === names.length - 1) result.reusedCategories++;
+            continue;
           }
+          catOrder += 100;
+          const cat = {
+            id: U.uid('cat'),
+            name: name,
+            parentId: parentId,
+            icon: i === names.length - 1 ? icon || '' : '',
+            order: catOrder,
+            collapsed: false,
+            createdAt: Date.now(),
+          };
+          d.categories.push(cat);
+          catByName.set(key, cat.id);
+          parentId = cat.id;
+          result.addedCategories++;
         }
+        return parentId;
+      }
 
-        const key = (parentId || '') + '|' + name;
-        if (catByName.has(key)) {
-          result.reusedCategories++;
-          return;
-        }
-        catOrder += 100;
-        const cat = {
-          id: U.uid('cat'),
-          name: name,
-          parentId: parentId,
-          icon: pc.icon || '',
-          order: catOrder,
-          collapsed: false,
-          createdAt: Date.now(),
-        };
-        d.categories.push(cat);
-        catByName.set(key, cat.id);
-        result.addedCategories++;
+      // 1. 先建分类（空文件夹也能建出来）
+      (payload.categories || []).forEach((pc) => {
+        const names = pathNamesOf(pc);
+        if (!names.length) return;
+        ensureCategory(names, pc.icon);
       });
 
       // 2. 再建站点
@@ -3777,60 +3965,16 @@ body.is-readonly .section-add { display: none !important; }
           return;
         }
 
-        // 定位分类
-        let catId = '';
-        const catName = String(ps.categoryName || '').trim().slice(0, 40);
-        const parentName = String(ps.parentName || '').trim().slice(0, 40);
-        if (catName) {
-          let parentId = null;
-          if (parentName) {
-            const pKey = '|' + parentName;
-            if (catByName.has(pKey)) parentId = catByName.get(pKey);
-            else {
-              catOrder += 100;
-              const pCat = {
-                id: U.uid('cat'),
-                name: parentName,
-                parentId: null,
-                icon: '',
-                order: catOrder,
-                collapsed: false,
-                createdAt: Date.now(),
-              };
-              d.categories.push(pCat);
-              catByName.set(pKey, pCat.id);
-              parentId = pCat.id;
-              result.addedCategories++;
-            }
-          }
-          const key = (parentId || '') + '|' + catName;
-          if (catByName.has(key)) {
-            catId = catByName.get(key);
-          } else if (mode !== 'newonly' || true) {
-            // 分类不存在则创建
-            catOrder += 100;
-            const cat = {
-              id: U.uid('cat'),
-              name: catName,
-              parentId: parentId,
-              icon: '',
-              order: catOrder,
-              collapsed: false,
-              createdAt: Date.now(),
-            };
-            d.categories.push(cat);
-            catByName.set(key, cat.id);
-            catId = cat.id;
-            result.addedCategories++;
-          }
-        }
+        // 定位分类：按完整路径逐层创建 / 复用
+        const names = pathNamesOf(ps);
+        const catId = names.length ? ensureCategory(names, '') : '';
 
         siteOrder += 100;
         d.sites.push({
           id: U.uid('s'),
           name: String(ps.name || '').trim().slice(0, 60) || U.getHost(n.url),
           url: n.url,
-          categoryId: catId,
+          categoryId: catId || '',
           description: String(ps.description || '').slice(0, 120),
           icon: String(ps.icon || ''),
           tags: Array.isArray(ps.tags) ? ps.tags.slice(0, 12) : [],
@@ -4000,6 +4144,10 @@ body.is-readonly .section-add { display: none !important; }
     getSite,
     topCategories,
     childCategories,
+    descendantIds,
+    categoryPath,
+    categoryDepth,
+    flatCategoryTree,
     sitesOfCategory,
     uncategorizedSites,
     uncategorizedName,
@@ -4721,9 +4869,15 @@ body.is-readonly .section-add { display: none !important; }
      </DL>
    注意：真实文件里 <DT>/<DD> 是隐式闭合的，浏览器解析后 DOM 树会被重排，
         因此必须按 DL 的 children 逐层递归，不能直接 querySelectorAll('a')。
+
+   分层规则：完整保留书签文件夹的目录层级（最多 MAX_DEPTH 层），
+            浏览器自带的根容器（收藏夹栏 / 其他书签 …）不计入层级。
    ============================================================ */
 (function (global) {
   'use strict';
+
+  /** 分类层级上限：超过这一层的文件夹不再新建分类，站点挂到该层 */
+  const MAX_DEPTH = 6;
 
   /** 需要跳过、不作为分类的根节点名称 */
   const ROOT_NAMES = [
@@ -4731,6 +4885,9 @@ body.is-readonly .section-add { display: none !important; }
     'favorites bar', 'favorites', 'bookmarks bar', 'bookmarks toolbar', 'bookmarks menu',
     'bookmarks', 'other bookmarks', 'mobile bookmarks', 'reading list',
   ];
+
+  /** 路径分隔符：用不可见字符，避免和文件夹名里的普通字符冲突 */
+  const SEP = '\u0001';
 
   function isRootName(name) {
     const n = String(name || '').trim().toLowerCase();
@@ -4744,11 +4901,15 @@ body.is-readonly .section-add { display: none !important; }
     if (!u) return true;
     // 伪协议 / 内部链接
     if (/^(javascript|place|about|chrome|edge|moz-extension|chrome-extension|data|file|blob):/i.test(u)) return true;
-    if (/^(javascript|place):/i.test(u)) return true;
     if (u.indexOf('wyciwyg:') === 0) return true;
     // 常见内部占位
     if (name && /^(javascript|新建书签|new bookmark)$/i.test(String(name).trim())) return true;
     return false;
+  }
+
+  /** 把分类路径数组转成唯一 key */
+  function pathKey(path) {
+    return (path || []).join(SEP);
   }
 
   /**
@@ -4772,17 +4933,18 @@ body.is-readonly .section-add { display: none !important; }
       };
     }
 
-    const categories = []; // { name, parentName }
-    const sites = []; // { name, url, categoryName, parentName, icon, addDate }
+    const catRecords = []; // { name, path:[names], icon }
+    const sites = []; // { name, url, path:[names], categoryName, parentName, icon, addDate }
     const seenUrl = new Set(); // 按剥离追踪参数后的规范化地址去重
     const seenRaw = new Set();
     const seenBase = new Set(); // 带查询串时，再记录一份「裸路径」用于兜底判重
     let skipped = 0;
+    let maxDepth = 0;
 
     /* ---------- 递归遍历 ---------- */
     /**
      * @param {Element} dl 当前层的 <DL>
-     * @param {Array<string>} path 当前的分类路径 [{name}] 最多两层
+     * @param {Array<{name:string, icon:string}>} path 当前分类路径
      */
     function walk(dl, path) {
       if (!dl || !dl.children) return;
@@ -4802,7 +4964,7 @@ body.is-readonly .section-add { display: none !important; }
 
           if (h3) {
             const name = cleanText(h3.textContent);
-            const nextPath = handleFolder(name, path, categories, h3);
+            const nextPath = handleFolder(name, path, h3);
             if (subDl) walk(subDl, nextPath);
           } else if (a) {
             pushSite(a, path);
@@ -4813,7 +4975,7 @@ body.is-readonly .section-add { display: none !important; }
         } else if (tag === 'H3') {
           // 结构被完全打平的兜底
           const name = cleanText(node.textContent);
-          const nextPath = handleFolder(name, path, categories, node);
+          const nextPath = handleFolder(name, path, node);
           const nextDl = nextSiblingDl(node);
           if (nextDl) walk(nextDl, nextPath);
         } else if (tag === 'A') {
@@ -4828,24 +4990,31 @@ body.is-readonly .section-add { display: none !important; }
     }
 
     /** 处理一个文件夹节点，返回新的路径 */
-    function handleFolder(name, path, catList, element) {
+    function handleFolder(name, path, element) {
       if (!name) return path;
 
       // 根容器：不作为分类，其子文件夹提升为一级
       if (isRootName(name)) return path;
 
-      // 已经有 2 层了（parent + child），更深的文件夹不再单独建分类，
-      // 站点归到第 2 层分类下，避免三层以上难用。
-      if (path.length >= 2) return path;
+      // 达到层级上限：不再新建分类，站点挂到当前最深一层
+      if (path.length >= MAX_DEPTH) return path;
 
-      const parentName = path.length === 1 ? path[0].name : '';
+      // 父子同名（少见，但有的导出工具会这样）：合并成一层
+      if (path.length && path[path.length - 1].name === name) return path;
+
       const record = {
         name: name,
-        parentName: parentName,
         icon: getFolderIcon(element),
       };
-      catList.push(record);
-      return path.concat([record]);
+      catRecords.push({
+        name: name,
+        icon: record.icon,
+        // 分类的完整路径：父路径 + 自己
+        path: path.map((p) => p.name).concat([name]),
+      });
+      const nextPath = path.concat([record]);
+      if (nextPath.length > maxDepth) maxDepth = nextPath.length;
+      return nextPath;
     }
 
     function nextSiblingDl(node) {
@@ -4901,14 +5070,14 @@ body.is-readonly .section-add { display: none !important; }
       const addDate = Number(aEl.getAttribute('add_date') || aEl.getAttribute('ADD_DATE') || 0);
       const icon = aEl.getAttribute('icon') || aEl.getAttribute('ICON') || '';
 
-      const parentName = path.length === 2 ? path[0].name : '';
-      const categoryName = path.length >= 1 ? path[path.length - 1].name : '';
+      const names = path.map((p) => p.name);
 
       sites.push({
         name: name.slice(0, 60),
         url: n.url,
-        categoryName: isRootName(categoryName) ? '' : categoryName,
-        parentName: parentName,
+        path: names,
+        categoryName: names.length ? names[names.length - 1] : '',
+        parentName: names.length > 1 ? names[names.length - 2] : '',
         // 内置 base64 图标体积较大，默认不保存；仅当很短时保留
         icon: icon && icon.length < 20000 && !/^data:/i.test(icon) ? icon : '',
         addDate: addDate ? addDate * 1000 : 0,
@@ -4946,65 +5115,81 @@ body.is-readonly .section-add { display: none !important; }
       };
     }
 
-    // 去重分类（同名同父只留一个）
-    const catSeen = new Set();
-    const finalCats = [];
-    categories.forEach((c) => {
-      const key = (c.parentName || '') + '|' + c.name;
-      if (catSeen.has(key)) return;
-      catSeen.add(key);
-      finalCats.push(c);
-    });
-
-    // 统计每个分类下的站点数
-    const countMap = {};
-    sites.forEach((s) => {
-      const key = (s.parentName || '') + '|' + (s.categoryName || '');
-      countMap[key] = (countMap[key] || 0) + 1;
-    });
-
-    const enriched = finalCats.map((c) => {
-      const key = (c.parentName || '') + '|' + c.name;
-      return {
+    /* ---------- 整理分类：按完整路径去重，并累计站点数 ---------- */
+    const catMap = new Map(); // pathKey -> category
+    const order = [];
+    catRecords.forEach((c) => {
+      const k = pathKey(c.path);
+      if (catMap.has(k)) return;
+      catMap.set(k, {
         name: c.name,
-        parentName: c.parentName,
         icon: c.icon,
-        count: countMap[key] || 0,
-        samples: sites
-          .filter((s) => s.categoryName === c.name && (s.parentName || '') === (c.parentName || ''))
-          .slice(0, 3)
-          .map((s) => s.name),
-      };
+        path: c.path,
+        depth: c.path.length,
+        count: 0, // 含所有子分类的站点数
+        direct: 0, // 只算直属站点
+        samples: [],
+      });
+      order.push(k);
     });
+
+    sites.forEach((s) => {
+      const names = s.path.slice();
+      // 自底向上累加每一层的计数
+      for (let d = names.length; d > 0; d--) {
+        const k = pathKey(names.slice(0, d));
+        const c = catMap.get(k);
+        if (!c) continue;
+        c.count++;
+        if (d === names.length) {
+          c.direct++;
+          if (c.samples.length < 3) c.samples.push(s.name);
+        }
+      }
+    });
+
+    const categories = order.map((k) => catMap.get(k));
+    const topCategories = categories.filter((c) => c.depth === 1).length;
 
     return {
       ok: true,
-      categories: enriched,
+      categories: categories,
       sites: sites,
       stats: {
         sites: sites.length,
-        categories: enriched.length,
-        topCategories: enriched.filter((c) => !c.parentName).length,
+        categories: categories.length,
+        topCategories: topCategories,
+        maxDepth: maxDepth,
         skipped: skipped,
       },
     };
   }
 
-  /** 计算真正会被导入的站点（按勾选的分类过滤） */
+  /**
+   * 兼容旧调用：按分类 key 过滤站点
+   * @param {object} parsed parse() 的结果
+   * @param {Array<string>} selectedKeys 形如 'a\u0001b'
+   */
   function filterSelection(parsed, selectedKeys) {
     const sel = new Set(selectedKeys || []);
-    const sites = parsed.sites.filter((s) => {
-      const key = (s.parentName || '') + '|' + (s.categoryName || '');
-      if (!s.categoryName) return sel.has('|'); // 未分类项
-      return sel.has(key);
+    return parsed.sites.filter((s) => {
+      const names = s.path || [];
+      if (!names.length) return sel.has('');
+      // 勾选父分类时，子分类下的站点一并导入
+      for (let d = 1; d <= names.length; d++) {
+        if (sel.has(pathKey(names.slice(0, d)))) return true;
+      }
+      return false;
     });
-    return sites;
   }
 
   global.Bookmark = {
+    MAX_DEPTH,
+    SEP,
     parse,
     filterSelection,
     isRootName,
+    pathKey,
   };
 })(window);
 </script>
@@ -5276,53 +5461,43 @@ body.is-readonly .section-add { display: none !important; }
       frag.appendChild(U.el('div', { class: 'cat-sect-title', text: '我的分类' }));
     }
 
-    tree.forEach((node) => {
-      const count = global.Store.sitesOfCategory(node.cat.id, true).length;
+    // 递归渲染分类树：任意层级，子级缩进
+    function renderNode(node, depth) {
+      const cat = node.cat;
+      const count = global.Store.sitesOfCategory(cat.id, true).length;
       const item = U.el(
         'div',
         {
-          class: 'cat-item' + (ui.activeCategory === node.cat.id ? ' is-active' : ''),
-          dataset: { cat: node.cat.id },
+          class:
+            'cat-item' +
+            (depth > 1 ? ' is-sub' : '') +
+            (ui.activeCategory === cat.id ? ' is-active' : ''),
+          dataset: { cat: cat.id, depth: String(depth) },
           role: 'button',
           tabindex: '0',
           draggable: readonly ? null : 'true',
+          title: depth > 1 ? global.Store.categoryPath(cat.id).join(' / ') : cat.name,
         },
         [
-          U.el('span', { class: 'cat-ico', text: node.cat.icon || '📁' }),
-          U.el('span', { class: 'cat-name', text: node.cat.name }),
+          U.el('span', { class: 'cat-ico', text: cat.icon || (depth > 1 ? '·' : '📁') }),
+          U.el('span', { class: 'cat-name', text: cat.name }),
           U.el('span', { class: 'cat-count', text: String(count) }),
           U.el('button', {
             class: 'cat-more',
             title: '分类操作',
             text: '⋯',
-            dataset: { more: node.cat.id },
+            dataset: { more: cat.id },
           }),
         ]
       );
-      item.dataset.dragcat = node.cat.id;
+      item.dataset.dragcat = cat.id;
+      if (depth > 1) item.style.setProperty('--depth', String(Math.min(depth - 1, 3)));
       frag.appendChild(item);
 
-      node.children.forEach((child) => {
-        const c2 = global.Store.sitesOfCategory(child.id, false).length;
-        const sub = U.el(
-          'div',
-          {
-            class: 'cat-item is-sub' + (ui.activeCategory === child.id ? ' is-active' : ''),
-            dataset: { cat: child.id },
-            role: 'button',
-            tabindex: '0',
-            draggable: readonly ? null : 'true',
-          },
-          [
-            U.el('span', { class: 'cat-ico', text: child.icon || '·' }),
-            U.el('span', { class: 'cat-name', text: child.name }),
-            U.el('span', { class: 'cat-count', text: String(c2) }),
-          ]
-        );
-        sub.dataset.dragcat = child.id;
-        frag.appendChild(sub);
-      });
-    });
+      node.children.forEach((child) => renderNode(child, depth + 1));
+    }
+
+    tree.forEach((node) => renderNode(node, 1));
 
     list.appendChild(frag);
   }
@@ -5367,9 +5542,15 @@ body.is-readonly .section-add { display: none !important; }
         class: 'section' + (collapsed ? ' is-collapsed' : ''),
         dataset: { group: g.id },
       });
+      // 多级分类：子层级的标题做缩进，视觉上体现层级
+      if (g.depth && g.depth > 1) {
+        section.classList.add('is-nested');
+        section.style.setProperty('--depth', String(Math.min(g.depth - 1, 3)));
+      }
       const head = U.el('div', { class: 'section-head', title: '点击折叠 / 展开' }, [
         U.el('div', { class: 'section-title' }, [
           U.el('span', { class: 'cat-ico', text: g.icon || '📁' }),
+          g.parentPath ? U.el('span', { class: 'section-path', text: g.parentPath + ' / ' }) : null,
           document.createTextNode(g.name),
         ]),
         U.el('span', { class: 'section-count', text: String(g.sites.length) }),
@@ -5456,10 +5637,9 @@ body.is-readonly .section-add { display: none !important; }
       });
 
       if (activeCategory !== 'all' && activeCategory !== 'unclassified' && activeCategory !== 'pinned') {
-        // 在搜索时若指定了分类，做一次过滤
+        // 在搜索时若指定了分类，做一次过滤（含所有子孙分类）
         const catId = activeCategory;
-        const allowed = new Set([catId]);
-        global.Store.childCategories(catId).forEach((c) => allowed.add(c.id));
+        const allowed = new Set([catId].concat(global.Store.descendantIds(catId)));
         const filtered = matched.filter((s) => allowed.has(s.categoryId));
         return [{ id: 'search', name: '搜索结果', icon: '🔍', sites: filtered }];
       }
@@ -5474,14 +5654,17 @@ body.is-readonly .section-add { display: none !important; }
         groups.push({ id: 'pinned', name: '常用置顶', icon: '📌', sites: pinned });
       }
 
-      global.Store.categoryTree().forEach((node) => {
-        const sites = global.Store.sitesOfCategory(node.cat.id, true);
+      // 按层级顺序展开：每个分类只显示自己的直属站点，层级用缩进表达
+      global.Store.flatCategoryTree().forEach((node) => {
+        const sites = global.Store.sitesOfCategory(node.cat.id, false);
         if (sites.length) {
           groups.push({
             id: node.cat.id,
             name: node.cat.name,
             icon: node.cat.icon || '📁',
             sites: sites,
+            depth: node.depth,
+            parentPath: global.Store.categoryPath(node.cat.id).slice(0, -1).join(' / '),
           });
         }
       });
@@ -5518,15 +5701,37 @@ body.is-readonly .section-add { display: none !important; }
     if (!cat) return [{ id: 'all', name: '全部站点', icon: '📚', sites: global.Store.getSites().slice().sort(global.Store.siteSorter) }];
 
     const out = [];
-    const own = global.Store.sitesOfCategory(cat.id, true);
+    // 本级直属站点
+    const own = global.Store.sitesOfCategory(cat.id, false);
     if (own.length) {
-      out.push({ id: cat.id, name: cat.name, icon: cat.icon || '📁', sites: own });
+      out.push({ id: cat.id, name: cat.name, icon: cat.icon || '📁', sites: own, depth: 1 });
     }
-    // 子分类单独成组
-    global.Store.childCategories(cat.id).forEach((child) => {
-      const cs = global.Store.sitesOfCategory(child.id, false);
-      if (cs.length) out.push({ id: child.id, name: child.name, icon: child.icon || '·', sites: cs });
-    });
+    // 子分类递归成组（各层只显示自己的直属站点，避免同一站点重复出现）
+    function findNode(nodes, id) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].cat.id === id) return nodes[i];
+        const hit = findNode(nodes[i].children, id);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    const rootNode = findNode(global.Store.categoryTree(), cat.id);
+    (function walk(children, depth) {
+      children.forEach((child) => {
+        const cs = global.Store.sitesOfCategory(child.cat.id, false);
+        if (cs.length) {
+          out.push({
+            id: child.cat.id,
+            name: child.cat.name,
+            icon: child.cat.icon || '📁',
+            sites: cs,
+            depth: depth,
+            parentPath: global.Store.categoryPath(child.cat.id).slice(0, -1).join(' / '),
+          });
+        }
+        walk(child.children, depth + 1);
+      });
+    })(rootNode ? rootNode.children : [], 2);
     return out;
   }
 
@@ -6259,8 +6464,10 @@ body.is-readonly .section-add { display: none !important; }
      ============================================================ */
 
   async function promptAddCategory(parentId) {
+    const parent = parentId ? global.Store.getCategory(parentId) : null;
+    const pathText = parent ? global.Store.categoryPath(parent.id).join(' / ') : '';
     const name = global.prompt(
-      parentId ? '新建二级分类（归在「' + (global.Store.getCategory(parentId) || {}).name + '」下）' : '新建分类名称'
+      parent ? '新建子分类（归在「' + pathText + '」下）' : '新建分类名称'
     );
     if (name === null) return;
     const trimmed = String(name).trim();
@@ -6310,7 +6517,7 @@ body.is-readonly .section-add { display: none !important; }
     if (!cat) return;
 
     const items = [
-      { label: '新建二级分类', act: 'addsub' },
+      { label: '新建子分类', act: 'addsub' },
       { label: '重命名', act: 'rename' },
       { label: '在此分类添加站点', act: 'addsite' },
       { label: '删除分类', act: 'delete', danger: true },
@@ -6327,11 +6534,11 @@ body.is-readonly .section-add { display: none !important; }
       } else if (act === 'addsite') {
         openSiteModal(null, cat.id);
       } else if (act === 'delete') {
-        const childCount = global.Store.childCategories(cat.id).length;
+        const childCount = global.Store.descendantIds(cat.id).length;
         const affected = global.Store.sitesOfCategory(cat.id, true).length;
         const detail =
-          '分类「' + cat.name + '」下有 ' + affected + ' 个站点' +
-          (childCount ? '，以及 ' + childCount + ' 个子分类' : '') +
+          '分类「' + global.Store.categoryPath(cat.id).join(' / ') + '」下有 ' + affected + ' 个站点' +
+          (childCount ? '，以及 ' + childCount + ' 个子分类（含多级）' : '') +
           '。\n\n删除后这些站点会变为「' + global.Store.uncategorizedName() + '」，不会丢失。';
 
         const ok = await confirm('删除分类', detail, '删除');
@@ -6438,19 +6645,73 @@ body.is-readonly .section-add { display: none !important; }
 
   /* ============================================================
      导入向导
+     - 分类按书签文件夹的完整目录层级展示（多级树）
+     - 每个站点可单独勾选，勾选文件夹 = 勾选其下全部站点
      ============================================================ */
+
+  const SEP = '\u0001';
 
   const importer = {
     step: 1,
     parsed: null,
-    selected: new Set(),
+    tree: null, // 分类树根节点
+    selected: new Set(), // 选中的站点下标
+    collapsed: new Set(), // 折叠的分类 path key
     fileName: '',
   };
+
+  /** 渲染出来的折叠行，便于「展开/收起全部」 */
+  let treeRows = [];
+  /** 站点下标 → 复选框，便于父级勾选时同步子项 */
+  let siteBoxes = new Map();
+
+  function pathKeyOf(names) {
+    return (names || []).join(SEP);
+  }
+
+  /** 把解析结果整理成分类树（节点自带站点下标） */
+  function buildImportTree(parsed) {
+    const root = { path: [], name: '', icon: '', children: [], sites: [] };
+    const map = Object.create(null);
+    map[''] = root;
+
+    (parsed.categories || []).forEach((c) => {
+      const path = c.path || [];
+      if (!path.length) return;
+      const k = pathKeyOf(path);
+      if (map[k]) return;
+      const parent = map[pathKeyOf(path.slice(0, -1))] || root;
+      const node = { path: path, name: c.name, icon: c.icon || '', children: [], sites: [] };
+      map[k] = node;
+      parent.children.push(node);
+    });
+
+    (parsed.sites || []).forEach((s, i) => {
+      const node = map[pathKeyOf(s.path || [])] || root;
+      node.sites.push(i);
+    });
+
+    return root;
+  }
+
+  /** 收集节点下全部站点下标（含所有子孙分类） */
+  function collectSiteIdx(node, out) {
+    const acc = out || [];
+    (node.sites || []).forEach((i) => acc.push(i));
+    (node.children || []).forEach((c) => collectSiteIdx(c, acc));
+    return acc;
+  }
+
+  function countOfNode(node) {
+    return collectSiteIdx(node).length;
+  }
 
   function openImport() {
     importer.step = 1;
     importer.parsed = null;
+    importer.tree = null;
     importer.selected = new Set();
+    importer.collapsed = new Set();
     importer.fileName = '';
     $('#fileInput').value = '';
     $('#importErr').hidden = true;
@@ -6484,6 +6745,7 @@ body.is-readonly .section-add { display: none !important; }
     });
     $('#btnImportBack').hidden = n === 1;
     $('#btnImportNext').textContent = n === 3 ? '开始导入' : '下一步';
+    if (n === 2) updateImportFootNote();
   }
 
   async function handleBookmarkFile(file) {
@@ -6517,9 +6779,17 @@ body.is-readonly .section-add { display: none !important; }
 
     importer.parsed = res;
     importer.fileName = file.name;
-    // 默认全选
-    importer.selected = new Set(res.categories.map((c) => (c.parentName || '') + '|' + c.name));
-    if (res.sites.some((s) => !s.categoryName)) importer.selected.add('|');
+    importer.tree = buildImportTree(res);
+
+    // 默认全部选中；一级目录展开、二级及更深折叠（书签可能上千条，全展开太卡）
+    importer.selected = new Set(res.sites.map((s, i) => i));
+    importer.collapsed = new Set();
+    (function markDeep(node) {
+      node.children.forEach((c) => {
+        if ((c.path || []).length >= 2) importer.collapsed.add(pathKeyOf(c.path));
+        markDeep(c);
+      });
+    })(importer.tree);
 
     renderImportPreview();
     goImportStep(2);
@@ -6535,14 +6805,14 @@ body.is-readonly .section-add { display: none !important; }
     const p = importer.parsed;
     const stats = $('#importStats');
     const tree = $('#importTree');
-    if (!p) return;
+    if (!p || !importer.tree) return;
 
     stats.textContent = '';
-    const unclassified = p.sites.filter((s) => !s.categoryName).length;
     [
       { n: p.stats.sites, l: '可导入站点', cls: '' },
-      { n: p.stats.topCategories, l: '一级分类', cls: 'is-muted' },
-      { n: p.stats.categories, l: '分类总数', cls: 'is-muted' },
+      { n: p.stats.topCategories, l: '一级目录', cls: 'is-muted' },
+      { n: p.stats.categories, l: '目录总数', cls: 'is-muted' },
+      { n: p.stats.maxDepth || 1, l: '最大层级', cls: 'is-muted' },
       { n: p.stats.skipped, l: '已跳过', cls: p.stats.skipped ? 'is-warn' : 'is-muted' },
     ].forEach((it) => {
       stats.appendChild(
@@ -6552,85 +6822,218 @@ body.is-readonly .section-add { display: none !important; }
         ])
       );
     });
-    void unclassified;
 
     tree.textContent = '';
-    const frag = document.createDocumentFragment();
+    treeRows = [];
+    siteBoxes = new Map();
 
-    // 未分类项
-    const unc = p.sites.filter((s) => !s.categoryName);
-    if (unc.length) {
+    const frag = document.createDocumentFragment();
+    const root = importer.tree;
+
+    // 书签栏根层没有文件夹的散点，归到「未分类」
+    if (root.sites.length) {
       frag.appendChild(
-        buildTreeItem(
-          { name: '（未分类）', parentName: '', icon: '📥' },
-          unc.length,
-          true
+        buildFolderRow(
+          { path: [], name: '（未分类）', icon: '📥', virtual: true, children: [], sites: root.sites },
+          1
         )
       );
     }
-
-    // 一级分类及其子分类
-    p.categories
-      .filter((c) => !c.parentName)
-      .forEach((top) => {
-        frag.appendChild(buildTreeItem(top, top.count, false, top.samples));
-        p.categories
-          .filter((c) => c.parentName === top.name)
-          .forEach((child) => {
-            const fakeTop = top;
-            const node = buildTreeItem(child, child.count, false, child.samples, fakeTop.name);
-            node.classList.add('tree-sub');
-            frag.appendChild(node);
-          });
-      });
+    root.children.forEach((node) => frag.appendChild(buildFolderRow(node, 1)));
 
     tree.appendChild(frag);
+    syncTreeChecks();
   }
 
-  function buildTreeItem(cat, count, isUnclassified, samples, parentName) {
-    const key = (parentName || cat.parentName || '') + '|' + (isUnclassified ? '' : cat.name);
-    const box = U.el('div', { class: 'tree-item' });
+  function hostOf(url) {
+    try {
+      return new URL(url).host.replace(/^www\./, '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** 一个文件夹行 + 其下的子目录与站点 */
+  function buildFolderRow(node, depth) {
+    const wrap = U.el('div', { class: 'tnode' });
+    const key = pathKeyOf(node.path);
+    const total = countOfNode(node);
+    const hasKids = node.children.length > 0 || node.sites.length > 0;
+
+    const row = U.el('div', {
+      class:
+        'trow tfolder' + (depth === 1 ? ' is-top' : '') + (node.virtual ? ' is-virtual' : ''),
+      dataset: { depth: String(depth) },
+    });
+    row.style.setProperty('--depth', String(depth));
+
+    const caret = U.el('button', {
+      class: 'tcaret' + (hasKids ? '' : ' is-ghost'),
+      type: 'button',
+      title: hasKids ? '展开 / 折叠' : '',
+      text: '▶',
+    });
 
     const label = U.el('label', { class: 'check' });
     const cb = U.el('input', { type: 'checkbox' });
-    cb.checked = importer.selected.has(key);
-    cb.dataset.key = key;
+    cb.dataset.folder = key;
+    cb._node = node;
+    label.appendChild(cb);
+
+    const icon = node.icon || (depth === 1 ? '📁' : '·');
+    label.appendChild(U.el('span', { class: 'tname', text: icon + ' ' + node.name, title: node.path.join(' / ') }));
+
+    row.appendChild(caret);
+    row.appendChild(label);
+    row.appendChild(U.el('span', { class: 'tbadge', text: total + ' 个' }));
+    wrap.appendChild(row);
+
+    const kids = U.el('div', { class: 'tchildren' });
+    node.sites.forEach((idx) => kids.appendChild(buildSiteRow(idx, depth + 1)));
+    node.children.forEach((child) => kids.appendChild(buildFolderRow(child, depth + 1)));
+    wrap.appendChild(kids);
+
+    const entry = { key: key, kids: kids, caret: caret };
+    treeRows.push(entry);
+    applyCollapsed(entry);
+
+    caret.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!hasKids) return;
+      if (importer.collapsed.has(key)) importer.collapsed.delete(key);
+      else importer.collapsed.add(key);
+      applyCollapsed(entry);
+    });
+
+    // 勾选文件夹 = 勾选它下面的全部站点（含子孙目录）
     cb.addEventListener('change', () => {
-      if (cb.checked) importer.selected.add(key);
-      else importer.selected.delete(key);
+      const ids = collectSiteIdx(node);
+      const on = cb.checked;
+      ids.forEach((i) => {
+        if (on) importer.selected.add(i);
+        else importer.selected.delete(i);
+        const box = siteBoxes.get(i);
+        if (box) box.checked = on;
+      });
+      syncTreeChecks();
+    });
+
+    return wrap;
+  }
+
+  function buildSiteRow(idx, depth) {
+    const s = importer.parsed.sites[idx];
+    const row = U.el('div', { class: 'trow tsite', dataset: { depth: String(depth) } });
+    row.style.setProperty('--depth', String(depth));
+
+    row.appendChild(U.el('span', { class: 'tcaret is-ghost', text: '▶' }));
+
+    const label = U.el('label', { class: 'check' });
+    const cb = U.el('input', { type: 'checkbox' });
+    cb.dataset.site = String(idx);
+    cb.checked = importer.selected.has(idx);
+    cb.addEventListener('change', () => {
+      if (cb.checked) importer.selected.add(idx);
+      else importer.selected.delete(idx);
+      syncTreeChecks();
     });
     label.appendChild(cb);
-    label.appendChild(U.el('span', { class: 'tree-name', text: (cat.icon ? cat.icon + ' ' : '') + cat.name }));
-    label.appendChild(U.el('span', { class: 'tree-badge', text: count + ' 个' }));
-    box.appendChild(label);
+    label.appendChild(U.el('span', { class: 'tname', text: s.name, title: s.name }));
+    row.appendChild(label);
 
-    const sampleList = samples || cat.samples || [];
-    if (sampleList.length) {
-      const s = U.el('div', { class: 'tree-samples' });
-      sampleList.forEach((n) => s.appendChild(U.el('span', { text: '· ' + n })));
-      box.appendChild(s);
-    }
-    return box;
+    const host = hostOf(s.url);
+    if (host) row.appendChild(U.el('span', { class: 'thost', text: host, title: s.url }));
+
+    siteBoxes.set(idx, cb);
+    return row;
   }
+
+  function applyCollapsed(entry) {
+    const collapsed = importer.collapsed.has(entry.key);
+    entry.kids.hidden = collapsed;
+    entry.caret.classList.toggle('is-open', !collapsed);
+  }
+
+  /** 刷新所有文件夹复选框的三态与全选框 */
+  function syncTreeChecks() {
+    $$('#importTree input[data-folder]').forEach((cb) => {
+      const node = cb._node;
+      if (!node) return;
+      const ids = collectSiteIdx(node);
+      let on = 0;
+      ids.forEach((i) => {
+        if (importer.selected.has(i)) on++;
+      });
+      cb.checked = ids.length > 0 && on === ids.length;
+      cb.indeterminate = on > 0 && on < ids.length;
+      cb.disabled = ids.length === 0;
+    });
+
+    const total = (importer.parsed && importer.parsed.sites.length) || 0;
+    const sel = importer.selected.size;
+    const all = $('#checkAllCats');
+    if (all) {
+      all.checked = total > 0 && sel === total;
+      all.indeterminate = sel > 0 && sel < total;
+    }
+    updateImportFootNote();
+  }
+
+  /** 底部提示：实时显示已勾选的站点数 */
+  function updateImportFootNote() {
+    const note = $('#importFootNote');
+    if (!note || importer.step !== 2) return;
+    const total = (importer.parsed && importer.parsed.sites.length) || 0;
+    note.textContent = '已选 ' + importer.selected.size + ' / ' + total + ' 个站点';
+  }
+
+  /** 展开 / 收起 全部分类 */
+  function toggleAllNodes(expand) {
+    treeRows.forEach((entry) => {
+      if (expand) importer.collapsed.delete(entry.key);
+      else if (entry.kids.children.length) importer.collapsed.add(entry.key);
+      applyCollapsed(entry);
+    });
+  }
+
 
   async function runImport() {
     if (!importer.parsed) return;
 
     const mode = ($$('input[name=importMode]').find((r) => r.checked) || {}).value || 'merge';
-    const sites = global.Bookmark.filterSelection(importer.parsed, Array.from(importer.selected));
 
-    if (!sites.length) {
-      toast('没有勾选任何分类，请返回上一步选择', 'warn');
+    // 按站点下标取勾选结果（每个站点都可以单独勾选）
+    const picked = Array.from(importer.selected)
+      .sort((a, b) => a - b)
+      .map((i) => importer.parsed.sites[i])
+      .filter(Boolean);
+
+    if (!picked.length) {
+      toast('还没有勾选任何站点，请返回上一步选择', 'warn');
       return;
     }
 
+    // 收集这些站点涉及的所有分类路径（父 → 子顺序），保证目录层级原样重建
+    const catIconByKey = new Map();
+    importer.parsed.categories.forEach((c) => catIconByKey.set(pathKeyOf(c.path), c.icon || ''));
+
+    const needCats = new Map();
+    picked.forEach((s) => {
+      const names = s.path || [];
+      for (let d = 1; d <= names.length; d++) {
+        const path = names.slice(0, d);
+        const k = pathKeyOf(path);
+        if (!needCats.has(k)) needCats.set(k, { path: path, icon: catIconByKey.get(k) || '' });
+      }
+    });
+
     const payload = {
-      categories: importer.parsed.categories
-        .filter((c) => importer.selected.has((c.parentName || '') + '|' + c.name))
-        .map((c) => ({ name: c.name, parentName: c.parentName, icon: c.icon })),
-      sites: sites.map((s) => ({
+      categories: Array.from(needCats.values()),
+      sites: picked.map((s) => ({
         name: s.name,
         url: s.url,
+        path: s.path || [],
         categoryName: s.categoryName,
         parentName: s.parentName,
         icon: s.icon,
@@ -7682,7 +8085,7 @@ body.is-readonly .section-add { display: none !important; }
         goImportStep(2);
       } else if (importer.step === 2) {
         if (!importer.selected.size) {
-          toast('请至少勾选一个分类', 'warn');
+          toast('请至少勾选一个站点', 'warn');
           return;
         }
         goImportStep(3);
@@ -7716,17 +8119,30 @@ body.is-readonly .section-add { display: none !important; }
 
     bind('#fileInput', 'change', (e) => {
       const f = e.target.files && e.target.files[0];
+      // 清空 value，保证「上一步」后重新选同一个文件也能触发
+      e.target.value = '';
       if (f) handleBookmarkFile(f);
     });
 
+    // 全选 / 全不选（作用于所有站点）
     bind('#checkAllCats', 'change', (e) => {
       const on = e.target.checked;
-      const boxes = $$('#importTree input[type=checkbox][data-key]');
-      boxes.forEach((cb) => {
-        cb.checked = on;
-        if (on) importer.selected.add(cb.dataset.key);
-        else importer.selected.delete(cb.dataset.key);
+      const total = (importer.parsed && importer.parsed.sites.length) || 0;
+      importer.selected = new Set();
+      if (on) {
+        for (let i = 0; i < total; i++) importer.selected.add(i);
+      }
+      siteBoxes.forEach((cb, i) => {
+        cb.checked = on && importer.selected.has(i);
       });
+      syncTreeChecks();
+    });
+
+    // 展开 / 收起 全部目录
+    bind('#btnTreeToggle', 'click', () => {
+      const expand = $('#btnTreeToggle').textContent.indexOf('展开') >= 0;
+      toggleAllNodes(expand);
+      $('#btnTreeToggle').textContent = expand ? '收起全部' : '展开全部';
     });
 
     $$('input[name=importMode]').forEach((r) => {

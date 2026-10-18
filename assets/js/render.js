@@ -264,53 +264,43 @@
       frag.appendChild(U.el('div', { class: 'cat-sect-title', text: '我的分类' }));
     }
 
-    tree.forEach((node) => {
-      const count = global.Store.sitesOfCategory(node.cat.id, true).length;
+    // 递归渲染分类树：任意层级，子级缩进
+    function renderNode(node, depth) {
+      const cat = node.cat;
+      const count = global.Store.sitesOfCategory(cat.id, true).length;
       const item = U.el(
         'div',
         {
-          class: 'cat-item' + (ui.activeCategory === node.cat.id ? ' is-active' : ''),
-          dataset: { cat: node.cat.id },
+          class:
+            'cat-item' +
+            (depth > 1 ? ' is-sub' : '') +
+            (ui.activeCategory === cat.id ? ' is-active' : ''),
+          dataset: { cat: cat.id, depth: String(depth) },
           role: 'button',
           tabindex: '0',
           draggable: readonly ? null : 'true',
+          title: depth > 1 ? global.Store.categoryPath(cat.id).join(' / ') : cat.name,
         },
         [
-          U.el('span', { class: 'cat-ico', text: node.cat.icon || '📁' }),
-          U.el('span', { class: 'cat-name', text: node.cat.name }),
+          U.el('span', { class: 'cat-ico', text: cat.icon || (depth > 1 ? '·' : '📁') }),
+          U.el('span', { class: 'cat-name', text: cat.name }),
           U.el('span', { class: 'cat-count', text: String(count) }),
           U.el('button', {
             class: 'cat-more',
             title: '分类操作',
             text: '⋯',
-            dataset: { more: node.cat.id },
+            dataset: { more: cat.id },
           }),
         ]
       );
-      item.dataset.dragcat = node.cat.id;
+      item.dataset.dragcat = cat.id;
+      if (depth > 1) item.style.setProperty('--depth', String(Math.min(depth - 1, 3)));
       frag.appendChild(item);
 
-      node.children.forEach((child) => {
-        const c2 = global.Store.sitesOfCategory(child.id, false).length;
-        const sub = U.el(
-          'div',
-          {
-            class: 'cat-item is-sub' + (ui.activeCategory === child.id ? ' is-active' : ''),
-            dataset: { cat: child.id },
-            role: 'button',
-            tabindex: '0',
-            draggable: readonly ? null : 'true',
-          },
-          [
-            U.el('span', { class: 'cat-ico', text: child.icon || '·' }),
-            U.el('span', { class: 'cat-name', text: child.name }),
-            U.el('span', { class: 'cat-count', text: String(c2) }),
-          ]
-        );
-        sub.dataset.dragcat = child.id;
-        frag.appendChild(sub);
-      });
-    });
+      node.children.forEach((child) => renderNode(child, depth + 1));
+    }
+
+    tree.forEach((node) => renderNode(node, 1));
 
     list.appendChild(frag);
   }
@@ -355,9 +345,15 @@
         class: 'section' + (collapsed ? ' is-collapsed' : ''),
         dataset: { group: g.id },
       });
+      // 多级分类：子层级的标题做缩进，视觉上体现层级
+      if (g.depth && g.depth > 1) {
+        section.classList.add('is-nested');
+        section.style.setProperty('--depth', String(Math.min(g.depth - 1, 3)));
+      }
       const head = U.el('div', { class: 'section-head', title: '点击折叠 / 展开' }, [
         U.el('div', { class: 'section-title' }, [
           U.el('span', { class: 'cat-ico', text: g.icon || '📁' }),
+          g.parentPath ? U.el('span', { class: 'section-path', text: g.parentPath + ' / ' }) : null,
           document.createTextNode(g.name),
         ]),
         U.el('span', { class: 'section-count', text: String(g.sites.length) }),
@@ -444,10 +440,9 @@
       });
 
       if (activeCategory !== 'all' && activeCategory !== 'unclassified' && activeCategory !== 'pinned') {
-        // 在搜索时若指定了分类，做一次过滤
+        // 在搜索时若指定了分类，做一次过滤（含所有子孙分类）
         const catId = activeCategory;
-        const allowed = new Set([catId]);
-        global.Store.childCategories(catId).forEach((c) => allowed.add(c.id));
+        const allowed = new Set([catId].concat(global.Store.descendantIds(catId)));
         const filtered = matched.filter((s) => allowed.has(s.categoryId));
         return [{ id: 'search', name: '搜索结果', icon: '🔍', sites: filtered }];
       }
@@ -462,14 +457,17 @@
         groups.push({ id: 'pinned', name: '常用置顶', icon: '📌', sites: pinned });
       }
 
-      global.Store.categoryTree().forEach((node) => {
-        const sites = global.Store.sitesOfCategory(node.cat.id, true);
+      // 按层级顺序展开：每个分类只显示自己的直属站点，层级用缩进表达
+      global.Store.flatCategoryTree().forEach((node) => {
+        const sites = global.Store.sitesOfCategory(node.cat.id, false);
         if (sites.length) {
           groups.push({
             id: node.cat.id,
             name: node.cat.name,
             icon: node.cat.icon || '📁',
             sites: sites,
+            depth: node.depth,
+            parentPath: global.Store.categoryPath(node.cat.id).slice(0, -1).join(' / '),
           });
         }
       });
@@ -506,15 +504,37 @@
     if (!cat) return [{ id: 'all', name: '全部站点', icon: '📚', sites: global.Store.getSites().slice().sort(global.Store.siteSorter) }];
 
     const out = [];
-    const own = global.Store.sitesOfCategory(cat.id, true);
+    // 本级直属站点
+    const own = global.Store.sitesOfCategory(cat.id, false);
     if (own.length) {
-      out.push({ id: cat.id, name: cat.name, icon: cat.icon || '📁', sites: own });
+      out.push({ id: cat.id, name: cat.name, icon: cat.icon || '📁', sites: own, depth: 1 });
     }
-    // 子分类单独成组
-    global.Store.childCategories(cat.id).forEach((child) => {
-      const cs = global.Store.sitesOfCategory(child.id, false);
-      if (cs.length) out.push({ id: child.id, name: child.name, icon: child.icon || '·', sites: cs });
-    });
+    // 子分类递归成组（各层只显示自己的直属站点，避免同一站点重复出现）
+    function findNode(nodes, id) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].cat.id === id) return nodes[i];
+        const hit = findNode(nodes[i].children, id);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    const rootNode = findNode(global.Store.categoryTree(), cat.id);
+    (function walk(children, depth) {
+      children.forEach((child) => {
+        const cs = global.Store.sitesOfCategory(child.cat.id, false);
+        if (cs.length) {
+          out.push({
+            id: child.cat.id,
+            name: child.cat.name,
+            icon: child.cat.icon || '📁',
+            sites: cs,
+            depth: depth,
+            parentPath: global.Store.categoryPath(child.cat.id).slice(0, -1).join(' / '),
+          });
+        }
+        walk(child.children, depth + 1);
+      });
+    })(rootNode ? rootNode.children : [], 2);
     return out;
   }
 

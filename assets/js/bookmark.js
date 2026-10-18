@@ -9,9 +9,15 @@
      </DL>
    注意：真实文件里 <DT>/<DD> 是隐式闭合的，浏览器解析后 DOM 树会被重排，
         因此必须按 DL 的 children 逐层递归，不能直接 querySelectorAll('a')。
+
+   分层规则：完整保留书签文件夹的目录层级（最多 MAX_DEPTH 层），
+            浏览器自带的根容器（收藏夹栏 / 其他书签 …）不计入层级。
    ============================================================ */
 (function (global) {
   'use strict';
+
+  /** 分类层级上限：超过这一层的文件夹不再新建分类，站点挂到该层 */
+  const MAX_DEPTH = 6;
 
   /** 需要跳过、不作为分类的根节点名称 */
   const ROOT_NAMES = [
@@ -19,6 +25,9 @@
     'favorites bar', 'favorites', 'bookmarks bar', 'bookmarks toolbar', 'bookmarks menu',
     'bookmarks', 'other bookmarks', 'mobile bookmarks', 'reading list',
   ];
+
+  /** 路径分隔符：用不可见字符，避免和文件夹名里的普通字符冲突 */
+  const SEP = '\u0001';
 
   function isRootName(name) {
     const n = String(name || '').trim().toLowerCase();
@@ -32,11 +41,15 @@
     if (!u) return true;
     // 伪协议 / 内部链接
     if (/^(javascript|place|about|chrome|edge|moz-extension|chrome-extension|data|file|blob):/i.test(u)) return true;
-    if (/^(javascript|place):/i.test(u)) return true;
     if (u.indexOf('wyciwyg:') === 0) return true;
     // 常见内部占位
     if (name && /^(javascript|新建书签|new bookmark)$/i.test(String(name).trim())) return true;
     return false;
+  }
+
+  /** 把分类路径数组转成唯一 key */
+  function pathKey(path) {
+    return (path || []).join(SEP);
   }
 
   /**
@@ -60,17 +73,18 @@
       };
     }
 
-    const categories = []; // { name, parentName }
-    const sites = []; // { name, url, categoryName, parentName, icon, addDate }
+    const catRecords = []; // { name, path:[names], icon }
+    const sites = []; // { name, url, path:[names], categoryName, parentName, icon, addDate }
     const seenUrl = new Set(); // 按剥离追踪参数后的规范化地址去重
     const seenRaw = new Set();
     const seenBase = new Set(); // 带查询串时，再记录一份「裸路径」用于兜底判重
     let skipped = 0;
+    let maxDepth = 0;
 
     /* ---------- 递归遍历 ---------- */
     /**
      * @param {Element} dl 当前层的 <DL>
-     * @param {Array<string>} path 当前的分类路径 [{name}] 最多两层
+     * @param {Array<{name:string, icon:string}>} path 当前分类路径
      */
     function walk(dl, path) {
       if (!dl || !dl.children) return;
@@ -90,7 +104,7 @@
 
           if (h3) {
             const name = cleanText(h3.textContent);
-            const nextPath = handleFolder(name, path, categories, h3);
+            const nextPath = handleFolder(name, path, h3);
             if (subDl) walk(subDl, nextPath);
           } else if (a) {
             pushSite(a, path);
@@ -101,7 +115,7 @@
         } else if (tag === 'H3') {
           // 结构被完全打平的兜底
           const name = cleanText(node.textContent);
-          const nextPath = handleFolder(name, path, categories, node);
+          const nextPath = handleFolder(name, path, node);
           const nextDl = nextSiblingDl(node);
           if (nextDl) walk(nextDl, nextPath);
         } else if (tag === 'A') {
@@ -116,24 +130,31 @@
     }
 
     /** 处理一个文件夹节点，返回新的路径 */
-    function handleFolder(name, path, catList, element) {
+    function handleFolder(name, path, element) {
       if (!name) return path;
 
       // 根容器：不作为分类，其子文件夹提升为一级
       if (isRootName(name)) return path;
 
-      // 已经有 2 层了（parent + child），更深的文件夹不再单独建分类，
-      // 站点归到第 2 层分类下，避免三层以上难用。
-      if (path.length >= 2) return path;
+      // 达到层级上限：不再新建分类，站点挂到当前最深一层
+      if (path.length >= MAX_DEPTH) return path;
 
-      const parentName = path.length === 1 ? path[0].name : '';
+      // 父子同名（少见，但有的导出工具会这样）：合并成一层
+      if (path.length && path[path.length - 1].name === name) return path;
+
       const record = {
         name: name,
-        parentName: parentName,
         icon: getFolderIcon(element),
       };
-      catList.push(record);
-      return path.concat([record]);
+      catRecords.push({
+        name: name,
+        icon: record.icon,
+        // 分类的完整路径：父路径 + 自己
+        path: path.map((p) => p.name).concat([name]),
+      });
+      const nextPath = path.concat([record]);
+      if (nextPath.length > maxDepth) maxDepth = nextPath.length;
+      return nextPath;
     }
 
     function nextSiblingDl(node) {
@@ -189,14 +210,14 @@
       const addDate = Number(aEl.getAttribute('add_date') || aEl.getAttribute('ADD_DATE') || 0);
       const icon = aEl.getAttribute('icon') || aEl.getAttribute('ICON') || '';
 
-      const parentName = path.length === 2 ? path[0].name : '';
-      const categoryName = path.length >= 1 ? path[path.length - 1].name : '';
+      const names = path.map((p) => p.name);
 
       sites.push({
         name: name.slice(0, 60),
         url: n.url,
-        categoryName: isRootName(categoryName) ? '' : categoryName,
-        parentName: parentName,
+        path: names,
+        categoryName: names.length ? names[names.length - 1] : '',
+        parentName: names.length > 1 ? names[names.length - 2] : '',
         // 内置 base64 图标体积较大，默认不保存；仅当很短时保留
         icon: icon && icon.length < 20000 && !/^data:/i.test(icon) ? icon : '',
         addDate: addDate ? addDate * 1000 : 0,
@@ -234,64 +255,80 @@
       };
     }
 
-    // 去重分类（同名同父只留一个）
-    const catSeen = new Set();
-    const finalCats = [];
-    categories.forEach((c) => {
-      const key = (c.parentName || '') + '|' + c.name;
-      if (catSeen.has(key)) return;
-      catSeen.add(key);
-      finalCats.push(c);
-    });
-
-    // 统计每个分类下的站点数
-    const countMap = {};
-    sites.forEach((s) => {
-      const key = (s.parentName || '') + '|' + (s.categoryName || '');
-      countMap[key] = (countMap[key] || 0) + 1;
-    });
-
-    const enriched = finalCats.map((c) => {
-      const key = (c.parentName || '') + '|' + c.name;
-      return {
+    /* ---------- 整理分类：按完整路径去重，并累计站点数 ---------- */
+    const catMap = new Map(); // pathKey -> category
+    const order = [];
+    catRecords.forEach((c) => {
+      const k = pathKey(c.path);
+      if (catMap.has(k)) return;
+      catMap.set(k, {
         name: c.name,
-        parentName: c.parentName,
         icon: c.icon,
-        count: countMap[key] || 0,
-        samples: sites
-          .filter((s) => s.categoryName === c.name && (s.parentName || '') === (c.parentName || ''))
-          .slice(0, 3)
-          .map((s) => s.name),
-      };
+        path: c.path,
+        depth: c.path.length,
+        count: 0, // 含所有子分类的站点数
+        direct: 0, // 只算直属站点
+        samples: [],
+      });
+      order.push(k);
     });
+
+    sites.forEach((s) => {
+      const names = s.path.slice();
+      // 自底向上累加每一层的计数
+      for (let d = names.length; d > 0; d--) {
+        const k = pathKey(names.slice(0, d));
+        const c = catMap.get(k);
+        if (!c) continue;
+        c.count++;
+        if (d === names.length) {
+          c.direct++;
+          if (c.samples.length < 3) c.samples.push(s.name);
+        }
+      }
+    });
+
+    const categories = order.map((k) => catMap.get(k));
+    const topCategories = categories.filter((c) => c.depth === 1).length;
 
     return {
       ok: true,
-      categories: enriched,
+      categories: categories,
       sites: sites,
       stats: {
         sites: sites.length,
-        categories: enriched.length,
-        topCategories: enriched.filter((c) => !c.parentName).length,
+        categories: categories.length,
+        topCategories: topCategories,
+        maxDepth: maxDepth,
         skipped: skipped,
       },
     };
   }
 
-  /** 计算真正会被导入的站点（按勾选的分类过滤） */
+  /**
+   * 兼容旧调用：按分类 key 过滤站点
+   * @param {object} parsed parse() 的结果
+   * @param {Array<string>} selectedKeys 形如 'a\u0001b'
+   */
   function filterSelection(parsed, selectedKeys) {
     const sel = new Set(selectedKeys || []);
-    const sites = parsed.sites.filter((s) => {
-      const key = (s.parentName || '') + '|' + (s.categoryName || '');
-      if (!s.categoryName) return sel.has('|'); // 未分类项
-      return sel.has(key);
+    return parsed.sites.filter((s) => {
+      const names = s.path || [];
+      if (!names.length) return sel.has('');
+      // 勾选父分类时，子分类下的站点一并导入
+      for (let d = 1; d <= names.length; d++) {
+        if (sel.has(pathKey(names.slice(0, d)))) return true;
+      }
+      return false;
     });
-    return sites;
   }
 
   global.Bookmark = {
+    MAX_DEPTH,
+    SEP,
     parse,
     filterSelection,
     isRootName,
+    pathKey,
   };
 })(window);

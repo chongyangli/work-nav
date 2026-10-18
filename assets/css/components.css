@@ -423,9 +423,11 @@ input[type="range"]::-moz-range-thumb {
 .stat-chip.is-warn { background: var(--warn-soft); }
 .stat-chip.is-warn .stat-num { color: var(--warn); }
 
-/* 分类树（导入预览） */
+/* 分类树（导入预览）
+   结构：.tnode > .trow + .tchildren > .tnode ...
+   缩进由 --depth 控制，站点行与文件夹行共用 .trow 布局 */
 .tree-wrap {
-  max-height: 320px;
+  max-height: 340px;
   overflow-y: auto;
   border: 1px solid var(--divider);
   border-radius: var(--r-card);
@@ -435,43 +437,88 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 0 4px 10px;
   border-bottom: 1px solid var(--divider);
   margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-elevated);
+  z-index: 2;
 }
-.tree-hint { font-size: 11.5px; color: var(--text-3); }
+.tree-tools { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tree-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; }
-.check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex: none; }
 
-.tree { display: flex; flex-direction: column; gap: 2px; }
-.tree-item { border-radius: var(--r-sm); }
-.tree-item > .check {
-  padding: 7px 8px;
+.tree { display: flex; flex-direction: column; gap: 1px; }
+.tchildren[hidden] { display: none; }
+
+.trow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px calc(8px + (var(--depth, 1) - 1) * 16px);
   border-radius: var(--r-sm);
-  font-weight: 550;
   transition: var(--trans);
+  min-width: 0;
 }
-.tree-item > .check:hover { background: var(--accent-soft); }
-.tree-item .tree-sub { padding-left: 26px; }
+.trow:hover { background: var(--accent-soft); }
 
-.tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-badge {
+/* 折叠箭头 */
+.tcaret {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  padding: 0;
+}
+.tcaret.is-open { transform: rotate(90deg); }
+.tcaret.is-ghost { visibility: hidden; cursor: default; }
+
+.tfolder .check { flex: 1; min-width: 0; font-weight: 600; }
+.tfolder.is-top .check { font-weight: 650; }
+.tsite .check { flex: 1; min-width: 0; font-weight: 400; }
+
+.tname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tsite .tname { color: var(--text-2); }
+.trow input:not(:checked) + .tname { color: var(--text-3); }
+
+.thost {
+  flex: none;
+  max-width: 38%;
+  font-size: 10.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbadge {
   font-size: 11px;
   color: var(--text-3);
   background: var(--bg);
   padding: 1px 7px;
   border-radius: 99px;
   flex: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.tree-samples {
-  padding: 2px 8px 8px 30px;
-  font-size: 11.5px;
-  color: var(--text-3);
-  line-height: 1.7;
-}
-.tree-samples span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 未分类这一层没有真实文件夹，弱化显示 */
+.tfolder.is-virtual .tname { font-style: normal; color: var(--text-2); }
 
 /* 导入模式选择 */
 .mode-group { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }

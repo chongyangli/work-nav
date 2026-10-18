@@ -279,21 +279,54 @@
       });
     }
 
-    // 清理孤儿 parentId
-    const removeSet = new Set();
+    // 清理孤儿 parentId：父级不存在 → 挂到一级
     out.categories.forEach((c) => {
       if (c.parentId && !catIds.has(c.parentId)) c.parentId = null;
     });
-    // 限制只有两层：父分类的 parentId 必须为空
+
+    // 环检测 + 层级上限：防止手工编辑或异常数据把树弄成环
     out.categories.forEach((c) => {
-      if (c.parentId) {
-        const p = out.categories.find((x) => x.id === c.parentId);
-        if (p && p.parentId) c.parentId = null; // 三级降级为一级
+      if (!c.parentId) return;
+      const chain = ancestorsOf(out.categories, c.parentId);
+      if (chain.indexOf(c.id) >= 0) {
+        c.parentId = null; // 自己出现在祖先链里 → 断开
+        return;
       }
+      if (depthOf(out.categories, c) > MAX_CATEGORY_DEPTH) c.parentId = null;
     });
-    void removeSet;
 
     return { data: out, issues: issues };
+  }
+
+  /** 分类最大层级（书签目录可能很深，但再深就没法用了） */
+  const MAX_CATEGORY_DEPTH = 6;
+
+  /** 收集某个分类的全部祖先 id（含自身），用于环检测 */
+  function ancestorsOf(list, id) {
+    const out = [];
+    const seen = new Set();
+    let cur = list.find((c) => c.id === id) || null;
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      out.push(cur.id);
+      cur = cur.parentId ? list.find((c) => c.id === cur.parentId) || null : null;
+    }
+    return out;
+  }
+
+  function depthOf(list, cat) {
+    let d = 1;
+    let cur = cat;
+    const seen = new Set([cat.id]);
+    while (cur.parentId) {
+      const p = list.find((c) => c.id === cur.parentId);
+      if (!p || seen.has(p.id)) break;
+      seen.add(p.id);
+      d++;
+      cur = p;
+      if (d > 64) break;
+    }
+    return d;
   }
 
   /* ============================================================
@@ -506,6 +539,7 @@
 
   global.Storage = {
     SCHEMA_VERSION,
+    MAX_CATEGORY_DEPTH,
     DEFAULT_SETTINGS,
     defaultData,
     normalize,

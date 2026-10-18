@@ -327,8 +327,10 @@
      ============================================================ */
 
   async function promptAddCategory(parentId) {
+    const parent = parentId ? global.Store.getCategory(parentId) : null;
+    const pathText = parent ? global.Store.categoryPath(parent.id).join(' / ') : '';
     const name = global.prompt(
-      parentId ? '新建二级分类（归在「' + (global.Store.getCategory(parentId) || {}).name + '」下）' : '新建分类名称'
+      parent ? '新建子分类（归在「' + pathText + '」下）' : '新建分类名称'
     );
     if (name === null) return;
     const trimmed = String(name).trim();
@@ -378,7 +380,7 @@
     if (!cat) return;
 
     const items = [
-      { label: '新建二级分类', act: 'addsub' },
+      { label: '新建子分类', act: 'addsub' },
       { label: '重命名', act: 'rename' },
       { label: '在此分类添加站点', act: 'addsite' },
       { label: '删除分类', act: 'delete', danger: true },
@@ -395,11 +397,11 @@
       } else if (act === 'addsite') {
         openSiteModal(null, cat.id);
       } else if (act === 'delete') {
-        const childCount = global.Store.childCategories(cat.id).length;
+        const childCount = global.Store.descendantIds(cat.id).length;
         const affected = global.Store.sitesOfCategory(cat.id, true).length;
         const detail =
-          '分类「' + cat.name + '」下有 ' + affected + ' 个站点' +
-          (childCount ? '，以及 ' + childCount + ' 个子分类' : '') +
+          '分类「' + global.Store.categoryPath(cat.id).join(' / ') + '」下有 ' + affected + ' 个站点' +
+          (childCount ? '，以及 ' + childCount + ' 个子分类（含多级）' : '') +
           '。\n\n删除后这些站点会变为「' + global.Store.uncategorizedName() + '」，不会丢失。';
 
         const ok = await confirm('删除分类', detail, '删除');
@@ -506,19 +508,73 @@
 
   /* ============================================================
      导入向导
+     - 分类按书签文件夹的完整目录层级展示（多级树）
+     - 每个站点可单独勾选，勾选文件夹 = 勾选其下全部站点
      ============================================================ */
+
+  const SEP = '\u0001';
 
   const importer = {
     step: 1,
     parsed: null,
-    selected: new Set(),
+    tree: null, // 分类树根节点
+    selected: new Set(), // 选中的站点下标
+    collapsed: new Set(), // 折叠的分类 path key
     fileName: '',
   };
+
+  /** 渲染出来的折叠行，便于「展开/收起全部」 */
+  let treeRows = [];
+  /** 站点下标 → 复选框，便于父级勾选时同步子项 */
+  let siteBoxes = new Map();
+
+  function pathKeyOf(names) {
+    return (names || []).join(SEP);
+  }
+
+  /** 把解析结果整理成分类树（节点自带站点下标） */
+  function buildImportTree(parsed) {
+    const root = { path: [], name: '', icon: '', children: [], sites: [] };
+    const map = Object.create(null);
+    map[''] = root;
+
+    (parsed.categories || []).forEach((c) => {
+      const path = c.path || [];
+      if (!path.length) return;
+      const k = pathKeyOf(path);
+      if (map[k]) return;
+      const parent = map[pathKeyOf(path.slice(0, -1))] || root;
+      const node = { path: path, name: c.name, icon: c.icon || '', children: [], sites: [] };
+      map[k] = node;
+      parent.children.push(node);
+    });
+
+    (parsed.sites || []).forEach((s, i) => {
+      const node = map[pathKeyOf(s.path || [])] || root;
+      node.sites.push(i);
+    });
+
+    return root;
+  }
+
+  /** 收集节点下全部站点下标（含所有子孙分类） */
+  function collectSiteIdx(node, out) {
+    const acc = out || [];
+    (node.sites || []).forEach((i) => acc.push(i));
+    (node.children || []).forEach((c) => collectSiteIdx(c, acc));
+    return acc;
+  }
+
+  function countOfNode(node) {
+    return collectSiteIdx(node).length;
+  }
 
   function openImport() {
     importer.step = 1;
     importer.parsed = null;
+    importer.tree = null;
     importer.selected = new Set();
+    importer.collapsed = new Set();
     importer.fileName = '';
     $('#fileInput').value = '';
     $('#importErr').hidden = true;
@@ -552,6 +608,7 @@
     });
     $('#btnImportBack').hidden = n === 1;
     $('#btnImportNext').textContent = n === 3 ? '开始导入' : '下一步';
+    if (n === 2) updateImportFootNote();
   }
 
   async function handleBookmarkFile(file) {
@@ -585,9 +642,17 @@
 
     importer.parsed = res;
     importer.fileName = file.name;
-    // 默认全选
-    importer.selected = new Set(res.categories.map((c) => (c.parentName || '') + '|' + c.name));
-    if (res.sites.some((s) => !s.categoryName)) importer.selected.add('|');
+    importer.tree = buildImportTree(res);
+
+    // 默认全部选中；一级目录展开、二级及更深折叠（书签可能上千条，全展开太卡）
+    importer.selected = new Set(res.sites.map((s, i) => i));
+    importer.collapsed = new Set();
+    (function markDeep(node) {
+      node.children.forEach((c) => {
+        if ((c.path || []).length >= 2) importer.collapsed.add(pathKeyOf(c.path));
+        markDeep(c);
+      });
+    })(importer.tree);
 
     renderImportPreview();
     goImportStep(2);
@@ -603,14 +668,14 @@
     const p = importer.parsed;
     const stats = $('#importStats');
     const tree = $('#importTree');
-    if (!p) return;
+    if (!p || !importer.tree) return;
 
     stats.textContent = '';
-    const unclassified = p.sites.filter((s) => !s.categoryName).length;
     [
       { n: p.stats.sites, l: '可导入站点', cls: '' },
-      { n: p.stats.topCategories, l: '一级分类', cls: 'is-muted' },
-      { n: p.stats.categories, l: '分类总数', cls: 'is-muted' },
+      { n: p.stats.topCategories, l: '一级目录', cls: 'is-muted' },
+      { n: p.stats.categories, l: '目录总数', cls: 'is-muted' },
+      { n: p.stats.maxDepth || 1, l: '最大层级', cls: 'is-muted' },
       { n: p.stats.skipped, l: '已跳过', cls: p.stats.skipped ? 'is-warn' : 'is-muted' },
     ].forEach((it) => {
       stats.appendChild(
@@ -620,85 +685,218 @@
         ])
       );
     });
-    void unclassified;
 
     tree.textContent = '';
-    const frag = document.createDocumentFragment();
+    treeRows = [];
+    siteBoxes = new Map();
 
-    // 未分类项
-    const unc = p.sites.filter((s) => !s.categoryName);
-    if (unc.length) {
+    const frag = document.createDocumentFragment();
+    const root = importer.tree;
+
+    // 书签栏根层没有文件夹的散点，归到「未分类」
+    if (root.sites.length) {
       frag.appendChild(
-        buildTreeItem(
-          { name: '（未分类）', parentName: '', icon: '📥' },
-          unc.length,
-          true
+        buildFolderRow(
+          { path: [], name: '（未分类）', icon: '📥', virtual: true, children: [], sites: root.sites },
+          1
         )
       );
     }
-
-    // 一级分类及其子分类
-    p.categories
-      .filter((c) => !c.parentName)
-      .forEach((top) => {
-        frag.appendChild(buildTreeItem(top, top.count, false, top.samples));
-        p.categories
-          .filter((c) => c.parentName === top.name)
-          .forEach((child) => {
-            const fakeTop = top;
-            const node = buildTreeItem(child, child.count, false, child.samples, fakeTop.name);
-            node.classList.add('tree-sub');
-            frag.appendChild(node);
-          });
-      });
+    root.children.forEach((node) => frag.appendChild(buildFolderRow(node, 1)));
 
     tree.appendChild(frag);
+    syncTreeChecks();
   }
 
-  function buildTreeItem(cat, count, isUnclassified, samples, parentName) {
-    const key = (parentName || cat.parentName || '') + '|' + (isUnclassified ? '' : cat.name);
-    const box = U.el('div', { class: 'tree-item' });
+  function hostOf(url) {
+    try {
+      return new URL(url).host.replace(/^www\./, '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** 一个文件夹行 + 其下的子目录与站点 */
+  function buildFolderRow(node, depth) {
+    const wrap = U.el('div', { class: 'tnode' });
+    const key = pathKeyOf(node.path);
+    const total = countOfNode(node);
+    const hasKids = node.children.length > 0 || node.sites.length > 0;
+
+    const row = U.el('div', {
+      class:
+        'trow tfolder' + (depth === 1 ? ' is-top' : '') + (node.virtual ? ' is-virtual' : ''),
+      dataset: { depth: String(depth) },
+    });
+    row.style.setProperty('--depth', String(depth));
+
+    const caret = U.el('button', {
+      class: 'tcaret' + (hasKids ? '' : ' is-ghost'),
+      type: 'button',
+      title: hasKids ? '展开 / 折叠' : '',
+      text: '▶',
+    });
 
     const label = U.el('label', { class: 'check' });
     const cb = U.el('input', { type: 'checkbox' });
-    cb.checked = importer.selected.has(key);
-    cb.dataset.key = key;
+    cb.dataset.folder = key;
+    cb._node = node;
+    label.appendChild(cb);
+
+    const icon = node.icon || (depth === 1 ? '📁' : '·');
+    label.appendChild(U.el('span', { class: 'tname', text: icon + ' ' + node.name, title: node.path.join(' / ') }));
+
+    row.appendChild(caret);
+    row.appendChild(label);
+    row.appendChild(U.el('span', { class: 'tbadge', text: total + ' 个' }));
+    wrap.appendChild(row);
+
+    const kids = U.el('div', { class: 'tchildren' });
+    node.sites.forEach((idx) => kids.appendChild(buildSiteRow(idx, depth + 1)));
+    node.children.forEach((child) => kids.appendChild(buildFolderRow(child, depth + 1)));
+    wrap.appendChild(kids);
+
+    const entry = { key: key, kids: kids, caret: caret };
+    treeRows.push(entry);
+    applyCollapsed(entry);
+
+    caret.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!hasKids) return;
+      if (importer.collapsed.has(key)) importer.collapsed.delete(key);
+      else importer.collapsed.add(key);
+      applyCollapsed(entry);
+    });
+
+    // 勾选文件夹 = 勾选它下面的全部站点（含子孙目录）
     cb.addEventListener('change', () => {
-      if (cb.checked) importer.selected.add(key);
-      else importer.selected.delete(key);
+      const ids = collectSiteIdx(node);
+      const on = cb.checked;
+      ids.forEach((i) => {
+        if (on) importer.selected.add(i);
+        else importer.selected.delete(i);
+        const box = siteBoxes.get(i);
+        if (box) box.checked = on;
+      });
+      syncTreeChecks();
+    });
+
+    return wrap;
+  }
+
+  function buildSiteRow(idx, depth) {
+    const s = importer.parsed.sites[idx];
+    const row = U.el('div', { class: 'trow tsite', dataset: { depth: String(depth) } });
+    row.style.setProperty('--depth', String(depth));
+
+    row.appendChild(U.el('span', { class: 'tcaret is-ghost', text: '▶' }));
+
+    const label = U.el('label', { class: 'check' });
+    const cb = U.el('input', { type: 'checkbox' });
+    cb.dataset.site = String(idx);
+    cb.checked = importer.selected.has(idx);
+    cb.addEventListener('change', () => {
+      if (cb.checked) importer.selected.add(idx);
+      else importer.selected.delete(idx);
+      syncTreeChecks();
     });
     label.appendChild(cb);
-    label.appendChild(U.el('span', { class: 'tree-name', text: (cat.icon ? cat.icon + ' ' : '') + cat.name }));
-    label.appendChild(U.el('span', { class: 'tree-badge', text: count + ' 个' }));
-    box.appendChild(label);
+    label.appendChild(U.el('span', { class: 'tname', text: s.name, title: s.name }));
+    row.appendChild(label);
 
-    const sampleList = samples || cat.samples || [];
-    if (sampleList.length) {
-      const s = U.el('div', { class: 'tree-samples' });
-      sampleList.forEach((n) => s.appendChild(U.el('span', { text: '· ' + n })));
-      box.appendChild(s);
-    }
-    return box;
+    const host = hostOf(s.url);
+    if (host) row.appendChild(U.el('span', { class: 'thost', text: host, title: s.url }));
+
+    siteBoxes.set(idx, cb);
+    return row;
   }
+
+  function applyCollapsed(entry) {
+    const collapsed = importer.collapsed.has(entry.key);
+    entry.kids.hidden = collapsed;
+    entry.caret.classList.toggle('is-open', !collapsed);
+  }
+
+  /** 刷新所有文件夹复选框的三态与全选框 */
+  function syncTreeChecks() {
+    $$('#importTree input[data-folder]').forEach((cb) => {
+      const node = cb._node;
+      if (!node) return;
+      const ids = collectSiteIdx(node);
+      let on = 0;
+      ids.forEach((i) => {
+        if (importer.selected.has(i)) on++;
+      });
+      cb.checked = ids.length > 0 && on === ids.length;
+      cb.indeterminate = on > 0 && on < ids.length;
+      cb.disabled = ids.length === 0;
+    });
+
+    const total = (importer.parsed && importer.parsed.sites.length) || 0;
+    const sel = importer.selected.size;
+    const all = $('#checkAllCats');
+    if (all) {
+      all.checked = total > 0 && sel === total;
+      all.indeterminate = sel > 0 && sel < total;
+    }
+    updateImportFootNote();
+  }
+
+  /** 底部提示：实时显示已勾选的站点数 */
+  function updateImportFootNote() {
+    const note = $('#importFootNote');
+    if (!note || importer.step !== 2) return;
+    const total = (importer.parsed && importer.parsed.sites.length) || 0;
+    note.textContent = '已选 ' + importer.selected.size + ' / ' + total + ' 个站点';
+  }
+
+  /** 展开 / 收起 全部分类 */
+  function toggleAllNodes(expand) {
+    treeRows.forEach((entry) => {
+      if (expand) importer.collapsed.delete(entry.key);
+      else if (entry.kids.children.length) importer.collapsed.add(entry.key);
+      applyCollapsed(entry);
+    });
+  }
+
 
   async function runImport() {
     if (!importer.parsed) return;
 
     const mode = ($$('input[name=importMode]').find((r) => r.checked) || {}).value || 'merge';
-    const sites = global.Bookmark.filterSelection(importer.parsed, Array.from(importer.selected));
 
-    if (!sites.length) {
-      toast('没有勾选任何分类，请返回上一步选择', 'warn');
+    // 按站点下标取勾选结果（每个站点都可以单独勾选）
+    const picked = Array.from(importer.selected)
+      .sort((a, b) => a - b)
+      .map((i) => importer.parsed.sites[i])
+      .filter(Boolean);
+
+    if (!picked.length) {
+      toast('还没有勾选任何站点，请返回上一步选择', 'warn');
       return;
     }
 
+    // 收集这些站点涉及的所有分类路径（父 → 子顺序），保证目录层级原样重建
+    const catIconByKey = new Map();
+    importer.parsed.categories.forEach((c) => catIconByKey.set(pathKeyOf(c.path), c.icon || ''));
+
+    const needCats = new Map();
+    picked.forEach((s) => {
+      const names = s.path || [];
+      for (let d = 1; d <= names.length; d++) {
+        const path = names.slice(0, d);
+        const k = pathKeyOf(path);
+        if (!needCats.has(k)) needCats.set(k, { path: path, icon: catIconByKey.get(k) || '' });
+      }
+    });
+
     const payload = {
-      categories: importer.parsed.categories
-        .filter((c) => importer.selected.has((c.parentName || '') + '|' + c.name))
-        .map((c) => ({ name: c.name, parentName: c.parentName, icon: c.icon })),
-      sites: sites.map((s) => ({
+      categories: Array.from(needCats.values()),
+      sites: picked.map((s) => ({
         name: s.name,
         url: s.url,
+        path: s.path || [],
         categoryName: s.categoryName,
         parentName: s.parentName,
         icon: s.icon,
@@ -1750,7 +1948,7 @@
         goImportStep(2);
       } else if (importer.step === 2) {
         if (!importer.selected.size) {
-          toast('请至少勾选一个分类', 'warn');
+          toast('请至少勾选一个站点', 'warn');
           return;
         }
         goImportStep(3);
@@ -1784,17 +1982,30 @@
 
     bind('#fileInput', 'change', (e) => {
       const f = e.target.files && e.target.files[0];
+      // 清空 value，保证「上一步」后重新选同一个文件也能触发
+      e.target.value = '';
       if (f) handleBookmarkFile(f);
     });
 
+    // 全选 / 全不选（作用于所有站点）
     bind('#checkAllCats', 'change', (e) => {
       const on = e.target.checked;
-      const boxes = $$('#importTree input[type=checkbox][data-key]');
-      boxes.forEach((cb) => {
-        cb.checked = on;
-        if (on) importer.selected.add(cb.dataset.key);
-        else importer.selected.delete(cb.dataset.key);
+      const total = (importer.parsed && importer.parsed.sites.length) || 0;
+      importer.selected = new Set();
+      if (on) {
+        for (let i = 0; i < total; i++) importer.selected.add(i);
+      }
+      siteBoxes.forEach((cb, i) => {
+        cb.checked = on && importer.selected.has(i);
       });
+      syncTreeChecks();
+    });
+
+    // 展开 / 收起 全部目录
+    bind('#btnTreeToggle', 'click', () => {
+      const expand = $('#btnTreeToggle').textContent.indexOf('展开') >= 0;
+      toggleAllNodes(expand);
+      $('#btnTreeToggle').textContent = expand ? '收起全部' : '展开全部';
     });
 
     $$('input[name=importMode]').forEach((r) => {
