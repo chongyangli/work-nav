@@ -227,7 +227,7 @@ input[type="range"]::-moz-range-thumb {
 .modal {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -521,6 +521,82 @@ input[type="range"]::-moz-range-thumb {
 /* 未分类这一层没有真实文件夹，弱化显示 */
 .tfolder.is-virtual .tname { font-style: normal; color: var(--text-2); }
 
+/* 从收藏夹挑单个站点（只回填表单，不新建分类） */
+.modal-narrow { width: min(600px, 100%); }
+
+.bm-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bm-search { flex: 1; margin-bottom: 0; font-size: 13px; }
+.bm-count { flex: none; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+.bm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: min(320px, 42vh);
+  overflow-y: auto;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-card);
+  padding: 6px;
+  background: var(--bg);
+}
+
+.bm-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--trans);
+}
+.bm-item:hover { background: var(--accent-soft); }
+.bm-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.bm-name {
+  flex: 0 1 auto;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-host {
+  flex: 0 0 auto;
+  max-width: 30%;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-empty { padding: 40px 8px; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.bm-hint { margin-top: 8px; font-size: 11.5px; color: var(--text-3); min-height: 0; }
+.bm-hint:empty { display: none; }
+
+@media (max-width: 560px) {
+  .bm-host { display: none; }
+}
+
 /* 导入模式选择 */
 .mode-group { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
 
@@ -569,7 +645,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ---------- 设置抽屉 ---------- */
-.drawer { position: fixed; inset: 0; z-index: 110; }
+.drawer { position: fixed; inset: 0; z-index: var(--z-drawer); }
 
 .drawer-mask {
   position: absolute;
@@ -741,7 +817,7 @@ input[type="range"]::-moz-range-thumb {
 /* ---------- 右键菜单 ---------- */
 .context-menu {
   position: fixed;
-  z-index: 200;
+  z-index: var(--z-context-menu);
   min-width: 150px;
   padding: 5px;
   border-radius: 9px;
@@ -769,7 +845,7 @@ input[type="range"]::-moz-range-thumb {
   bottom: 22px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 300;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column-reverse;
   gap: 8px;
@@ -924,7 +1000,7 @@ input[type="range"]::-moz-range-thumb {
   left: 50%;
   bottom: 22px;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: var(--z-select-bar);
   display: flex;
   align-items: center;
   gap: 8px;

@@ -111,7 +111,7 @@
     </div>
     <div class="modal-tip" id="siteImportTip">
       <svg class="ico" viewBox="0 0 24 24"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l2 2h7a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 18 19H5.5A1.5 1.5 0 0 1 4 17.5z"/><path d="M9 13.5h6M12 10.5v6"/></svg>
-      <span class="modal-tip-text">要一次添加多个站点？<button class="link-btn" id="btnImportFromBookmark" type="button">从浏览器书签导入</button>，会自动按书签文件夹生成分类。</span>
+      <span class="modal-tip-text">要一次添加多个站点？<button class="link-btn" id="btnImportFromBookmark" type="button">从浏览器书签导入</button>；只补一条？<button class="link-btn" id="btnPickFromBookmark" type="button">从收藏夹挑一个</button>，会填入本表单并归到当前选中的分类，不新建分类。</span>
     </div>
     <div class="modal-body">
       <form class="form" id="siteForm" novalidate>
@@ -192,7 +192,37 @@
   </div>
 </div>
 
+<!-- ===== 从收藏夹挑单个站点 ===== -->
+<input accept=".html,.htm,text/html" hidden id="bmFileInput" type="file">
+<div class="modal" hidden id="bmPickModal">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-panel modal-narrow">
+    <div class="modal-head">
+      <h3>从收藏夹挑一个站点</h3>
+      <button class="icon-btn" data-close title="关闭">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body is-stack">
+      <div class="bm-bar">
+        <input autocomplete="off" class="text-input bm-search" id="bmSearch" placeholder="搜索名称、网址或书签目录…" spellcheck="false" type="text">
+        <span class="bm-count" id="bmCount"></span>
+      </div>
+      <div class="bm-list" id="bmList"></div>
+      <p class="bm-hint" id="bmHint"></p>
+      <p class="note-err" hidden id="bmErr"></p>
+    </div>
+    <div class="modal-foot">
+      <span class="foot-note" id="bmFootNote">只会填入表单，不会新建分类</span>
+      <div class="foot-right">
+        <button class="btn btn-outline" data-close>取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 导入向导弹窗 ===== -->
+
 <div class="modal" hidden id="importModal">
   <div class="modal-mask" data-close></div>
   <div class="modal-panel modal-wide">

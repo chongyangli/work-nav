@@ -77,10 +77,16 @@
 
   const openStack = [];
 
+  // 弹窗层级基线，与 CSS 的 --z-modal 保持一致（必须高于抽屉 110）
+  const Z_MODAL_BASE = 120;
+
   function openModal(id) {
     const m = document.getElementById(id);
     if (!m) return;
     m.hidden = false;
+    // 按打开顺序递增层级：设置抽屉里点「查看访问统计」时，
+    // 统计弹窗必须压在抽屉之上，而不是被抽屉盖住。
+    m.style.zIndex = String(Z_MODAL_BASE + openStack.length * 2);
     openStack.push(id);
     document.body.style.overflow = 'hidden';
   }
@@ -90,6 +96,7 @@
     if (!m) return;
     if (id === 'confirmModal') m.dataset.confirmBound = '';
     m.hidden = true;
+    m.style.zIndex = '';
     const i = openStack.indexOf(id);
     if (i >= 0) openStack.splice(i, 1);
     if (!openStack.length) document.body.style.overflow = '';
@@ -147,13 +154,14 @@
     if (!sel) return;
     sel.textContent = '';
     sel.appendChild(U.el('option', { value: '', text: global.Store.uncategorizedName() }));
-    global.Store.categoryTree().forEach((node) => {
-      sel.appendChild(U.el('option', { value: node.cat.id, text: node.cat.name }));
-      node.children.forEach((c) => {
-        sel.appendChild(U.el('option', { value: c.id, text: '　└ ' + c.name }));
-      });
+    // 分类可到 6 层，必须按扁平树平铺，不能只渲染两层
+    global.Store.flatCategoryTree().forEach((item) => {
+      const indent = item.depth > 1 ? '　'.repeat(item.depth - 1) + '└ ' : '';
+      sel.appendChild(U.el('option', { value: item.cat.id, text: indent + item.cat.name }));
     });
     sel.value = selected || '';
+    // 目标分类已被删除时回落到未分类，避免选中错位
+    if (sel.selectedIndex < 0) sel.value = '';
   }
 
   function openSiteModal(siteOrNull, presetCategoryId) {
@@ -320,6 +328,149 @@
       }
     };
     btn.addEventListener('click', handler);
+  }
+
+  /* ============================================================
+     从收藏夹挑单个站点：只填入表单，绝不新建分类
+     ============================================================ */
+
+  const bmPick = { sites: [], hits: [], fileName: '' };
+  let bmPickTimer = 0;
+  const BM_LIST_MAX = 400;
+
+  function pickFromBookmark() {
+    if (global.Store.isReadOnly()) {
+      toast('这是只读快照，不能编辑站点', 'info');
+      return;
+    }
+    const input = $('#bmFileInput');
+    input.value = '';
+    input.click();
+  }
+
+  async function handleBmFile(file) {
+    if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast('文件过大（' + U.fileSize(file.size) + '），请确认是否选错了文件。', 'error');
+      return;
+    }
+
+    let text;
+    try {
+      text = await U.readFileAsText(file);
+    } catch (e) {
+      toast('文件读取失败：' + (e.message || '未知错误'), 'error');
+      return;
+    }
+
+    if (/<plist/i.test(text.slice(0, 2000))) {
+      toast('这看起来是 Safari 导出的 plist 格式，暂不支持。建议用 Chrome / Edge / Firefox 导入后再导出。', 'error');
+      return;
+    }
+
+    const res = global.Bookmark.parse(text);
+    if (!res.ok) {
+      toast(res.message, 'error');
+      return;
+    }
+
+    bmPick.sites = res.sites;
+    bmPick.hits = [];
+    bmPick.fileName = file.name;
+    $('#bmSearch').value = '';
+    $('#bmHint').textContent = '已读取「' + file.name + '」，共 ' + res.sites.length + ' 条书签';
+    renderBmList('');
+    openModal('bmPickModal');
+    setTimeout(() => $('#bmSearch').focus(), 80);
+  }
+
+  function renderBmList(keyword) {
+    const list = $('#bmList');
+    const all = bmPick.sites;
+    const q = String(keyword || '').trim().toLowerCase();
+
+    let hits = all.map((s, i) => i);
+    if (q) {
+      const terms = q.split(/\s+/).filter(Boolean);
+      hits = hits.filter((i) => {
+        const s = all[i];
+        const hay = (s.name + ' ' + s.url + ' ' + (s.path || []).join(' ')).toLowerCase();
+        return terms.every((t) => hay.indexOf(t) >= 0);
+      });
+    }
+    bmPick.hits = hits;
+
+    list.textContent = '';
+    if (!hits.length) {
+      list.appendChild(U.el('p', { class: 'bm-empty', text: '没有匹配的书签，换个关键词试试' }));
+    } else {
+      const frag = document.createDocumentFragment();
+      hits.slice(0, BM_LIST_MAX).forEach((i) => frag.appendChild(buildBmItem(i)));
+      list.appendChild(frag);
+      if (hits.length > BM_LIST_MAX) {
+        list.appendChild(
+          U.el('p', { class: 'bm-empty', text: '只显示前 ' + BM_LIST_MAX + ' 条，继续输入关键词缩小范围' })
+        );
+      }
+    }
+
+    const cnt = $('#bmCount');
+    if (cnt) cnt.textContent = q ? hits.length + ' / ' + all.length : all.length + ' 条';
+    list.scrollTop = 0;
+  }
+
+  function buildBmItem(idx) {
+    const s = bmPick.sites[idx];
+    const btn = U.el('button', { class: 'bm-item', type: 'button', title: s.url });
+    btn.appendChild(U.el('span', { class: 'bm-name', text: s.name }));
+    const host = hostOf(s.url);
+    if (host) btn.appendChild(U.el('span', { class: 'bm-host', text: host }));
+    btn.appendChild(U.el('span', { class: 'bm-path', text: (s.path || []).join(' / ') || '（书签栏根目录）' }));
+    btn.addEventListener('click', () => applyBmSite(idx));
+    return btn;
+  }
+
+  /** 在已有分类里按书签路径从深到浅找匹配，找不到返回 null（不新建） */
+  function matchExistingCategory(names) {
+    const path = (names || []).filter(Boolean);
+    if (!path.length) return null;
+    const byPath = new Map();
+    global.Store.flatCategoryTree().forEach((it) => {
+      byPath.set(global.Store.categoryPath(it.cat.id).join(SEP), it.cat);
+    });
+    for (let d = path.length; d >= 1; d--) {
+      const hit = byPath.get(path.slice(0, d).join(SEP));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function applyBmSite(idx) {
+    const s = bmPick.sites[idx];
+    if (!s) return;
+
+    $('#fName').value = String(s.name || '').slice(0, 30);
+    $('#fUrl').value = s.url || '';
+    if (s.icon) $('#fIcon').value = s.icon;
+    clearFieldErrors();
+    updatePreview();
+
+    // 分类只认已存在的分类，绝不新建；没匹配就保持当前选择不动
+    const sel = $('#fCategory');
+    const match = matchExistingCategory(s.path || []);
+    let msg;
+    if (match && match.id) {
+      sel.value = match.id;
+      msg = '已填入「' + $('#fName').value + '」，归到已有分类「' + global.Store.categoryPath(match.id).join(' / ') + '」';
+    } else {
+      const stay = sel.value ? global.Store.categoryPath(sel.value).join(' / ') : global.Store.uncategorizedName();
+      msg = '已填入「' + $('#fName').value + '」，分类保持「' + stay + '」';
+    }
+
+    closeModal('bmPickModal');
+    toast(msg, 'success', { duration: 3800 });
+    setTimeout(() => $('#fName').focus(), 120);
   }
 
   /* ============================================================
@@ -1960,6 +2111,28 @@
     bind('#btnImportFromBookmark', 'click', () => {
       closeModal('siteModal');
       openImport();
+    });
+
+    // 从收藏夹挑单个站点：读文件 → 搜索列表 → 回填表单
+    bind('#btnPickFromBookmark', 'click', pickFromBookmark);
+
+    bind('#bmFileInput', 'change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) handleBmFile(f);
+    });
+
+    bind('#bmSearch', 'input', (e) => {
+      const kw = e.target.value;
+      clearTimeout(bmPickTimer);
+      bmPickTimer = setTimeout(() => renderBmList(kw), 120);
+    });
+
+    // 回车直接选第一条匹配，选中后回到站点表单
+    bind('#bmSearch', 'keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (bmPick.hits.length) applyBmSite(bmPick.hits[0]);
     });
 
     bind('#siteForm', 'submit', (e) => {

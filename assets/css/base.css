@@ -49,6 +49,16 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --trans: all 0.2s var(--ease);
 
+  /* 层级阶梯：数值越大越靠前。统一在这里约定，避免再出现
+     「从设置抽屉里打开的弹窗被抽屉盖住」这类层叠错误。 */
+  --z-sidebar-mask: 15;
+  --z-topbar: 20;
+  --z-select-bar: 60;
+  --z-drawer: 110;
+  --z-modal: 120;      /* 必须高于抽屉：弹窗可以从抽屉里打开 */
+  --z-context-menu: 200;
+  --z-toast: 300;
+
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
 }
